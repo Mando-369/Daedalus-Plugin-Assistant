@@ -174,9 +174,9 @@ const App = (() => {
                     const rawText = msgText.textContent;
                     msgText.innerHTML = renderMarkdown(rawText);
 
-                    // Add sources
+                    // Add sources + search online button
+                    const body = currentAssistantEl.querySelector('.msg-body');
                     if (currentAssistantEl._sources && currentAssistantEl._sources.length) {
-                        const body = currentAssistantEl.querySelector('.msg-body');
                         const sourcesDiv = document.createElement('div');
                         sourcesDiv.className = 'msg-sources';
                         currentAssistantEl._sources.forEach(s => {
@@ -187,6 +187,12 @@ const App = (() => {
                         });
                         body.appendChild(sourcesDiv);
                     }
+
+                    // Add "Search Online" button per response
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'msg-actions';
+                    actionsDiv.innerHTML = `<button class="btn btn-sm btn-web-search" onclick="App.searchOnlineForResponse(this)">Search Online</button>`;
+                    body.appendChild(actionsDiv);
                     // Store in history (answer only, not thinking)
                     chatHistory.push({ role: 'assistant', content: rawText });
                     currentAssistantEl = null;
@@ -597,6 +603,110 @@ const App = (() => {
         }
     }
 
+    // ── Web Search in Chat ───────────────────────
+    async function webSearchFromInput() {
+        const input = document.getElementById('chat-input');
+        const query = input.value.trim();
+        if (!query) return;
+
+        // Auto-create conversation if needed
+        if (!currentConversationId) {
+            await newConversation();
+        }
+
+        const welcome = document.querySelector('.chat-welcome');
+        if (welcome) welcome.remove();
+
+        // Show user's search query
+        appendChatMessage('user', query);
+        chatHistory.push({ role: 'user', content: query });
+        input.value = '';
+
+        // Show searching status
+        appendChatMessage('assistant', '', true);
+        const statusEl = currentAssistantEl.querySelector('.msg-status');
+        if (statusEl) statusEl.textContent = 'Searching the web...';
+
+        try {
+            // Fetch web results
+            const resp = await fetch('/api/web-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query }),
+            });
+            const data = await resp.json();
+            const results = data.results || [];
+
+            // Build web context for the LLM
+            const webContext = results.map(r => {
+                let text = `${r.title}\n${r.url}\n${r.snippet || ''}`;
+                if (r.page_content) text += `\n${r.page_content}`;
+                return text;
+            }).join('\n\n---\n\n');
+
+            // Now send to LLM with web context
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Remove the placeholder
+                if (currentAssistantEl) currentAssistantEl.remove();
+                currentAssistantEl = null;
+
+                appendChatMessage('assistant', '', true);
+                ws.send(JSON.stringify({
+                    message: `Based on these web search results, answer: ${query}`,
+                    history: chatHistory.slice(-6),
+                    conversation_id: currentConversationId,
+                    web_context: webContext,
+                }));
+            }
+        } catch (e) {
+            if (currentAssistantEl) {
+                const msgText = currentAssistantEl.querySelector('.msg-text');
+                msgText.textContent = `Search failed: ${e.message}`;
+                currentAssistantEl = null;
+            }
+        }
+        loadConversations();
+    }
+
+    async function searchOnlineForResponse(btn) {
+        // Extract the last user query from chat history
+        const lastUserMsg = chatHistory.filter(m => m.role === 'user').pop();
+        if (!lastUserMsg) return;
+
+        btn.disabled = true;
+        btn.textContent = 'Searching...';
+
+        try {
+            const resp = await fetch('/api/web-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: lastUserMsg.content }),
+            });
+            const data = await resp.json();
+            const results = data.results || [];
+
+            const webContext = results.map(r => {
+                let text = `${r.title}\n${r.url}\n${r.snippet || ''}`;
+                if (r.page_content) text += `\n${r.page_content}`;
+                return text;
+            }).join('\n\n---\n\n');
+
+            // Send a follow-up with web context
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                appendChatMessage('assistant', '', true);
+                ws.send(JSON.stringify({
+                    message: `I searched the web for more information about: "${lastUserMsg.content}". Use these web results to give me a more detailed answer.`,
+                    history: chatHistory.slice(-6),
+                    conversation_id: currentConversationId,
+                    web_context: webContext,
+                }));
+                chatHistory.push({ role: 'user', content: `[Web search: ${lastUserMsg.content}]` });
+            }
+        } catch (e) {
+            btn.textContent = 'Search failed';
+        }
+    }
+
     // ── Conversations ──────────────────────────
     async function loadConversations(search = null) {
         try {
@@ -931,6 +1041,8 @@ const App = (() => {
         triggerScan,
         startEnrichment,
         enrichSingle,
+        webSearchFromInput,
+        searchOnlineForResponse,
         newConversation,
         switchConversation,
         deleteConversation,

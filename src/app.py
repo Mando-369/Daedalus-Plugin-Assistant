@@ -510,6 +510,7 @@ async def websocket_chat(websocket: WebSocket):
             user_query = msg.get("message", "")
             history = msg.get("history", [])
             conv_id = msg.get("conversation_id")
+            web_context = msg.get("web_context", "")  # optional web search results
 
             # Save user message to conversation
             if conv_id:
@@ -540,6 +541,10 @@ async def websocket_chat(websocket: WebSocket):
 
                 plugins = await asyncio.to_thread(rag.hybrid_search, user_query)
                 context = rag.build_context(plugins)
+
+                # Append web search context if provided
+                if web_context:
+                    context += f"\n\nAdditional web research:\n{web_context}"
 
                 sources = [
                     {
@@ -593,6 +598,35 @@ async def websocket_chat(websocket: WebSocket):
 
     except WebSocketDisconnect:
         pass
+
+
+# ── Web Search API ────────────────────────────────
+
+class WebSearchRequest(BaseModel):
+    query: str
+    fetch_top: int = 2  # how many result pages to fetch full content
+
+
+@app.post("/api/web-search")
+async def web_search_api(request: WebSearchRequest):
+    """Search the web via SearXNG/DDG and optionally fetch top result pages."""
+    from src.agents.tools import web_search, fetch_page
+
+    results = await asyncio.to_thread(web_search, request.query)
+
+    # Fetch full content from top results
+    enriched = []
+    for r in results[:request.fetch_top]:
+        url = r.get("url", "")
+        if url and not r.get("error") and not r.get("info"):
+            page_text = await asyncio.to_thread(fetch_page, url)
+            r["page_content"] = page_text[:2000] if page_text else None
+        enriched.append(r)
+
+    # Keep remaining results without page content
+    enriched.extend(results[request.fetch_top:])
+
+    return {"results": enriched}
 
 
 # ── Scan & Populate API ───────────────────────────

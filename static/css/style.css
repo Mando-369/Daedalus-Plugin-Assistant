@@ -400,6 +400,32 @@ body {
 .msg-text strong { color: var(--text-primary); }
 .msg-text hr { border: none; border-top: 1px solid var(--border-color); margin: 12px 0; }
 
+.msg-actions {
+    margin-top: 8px;
+    padding-top: 6px;
+}
+
+.btn-web-search {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    padding: 4px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-web-search:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.chat-input-area .btn-web-search {
+    white-space: nowrap;
+}
+
 .msg-sources {
     display: flex;
     flex-wrap: wrap;
