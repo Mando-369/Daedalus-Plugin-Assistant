@@ -25,28 +25,19 @@ def clean_plugin_name(filename: str, extension: str) -> str:
     return name.strip()
 
 
-def _make_display_name(raw_name: str) -> str:
+def _make_display_name(raw_name: str, plist_display: str = None) -> str:
     """Convert a raw plugin name into a human-readable display name.
 
-    Examples:
-        uaudio_manley_voxbox    → Manley VoxBox
-        uaudio_teletronix_la-2a → Teletronix LA-2A
-        uaudio_api_2500         → API 2500
-        BlackRoosterAudio VLA-2A Mark II → VLA-2A Mark II
+    If plist_display is provided (from AudioComponents name, after the ": "),
+    use that directly -- it's the developer's own chosen display name.
+    Otherwise, clean up the raw filename heuristically.
     """
-    name = raw_name
+    # Prefer the plist-provided display name (developer's own naming)
+    if plist_display:
+        return plist_display.strip()
 
-    # Strip known vendor prefixes from filenames
-    vendor_prefixes = [
-        "uaudio_",         # Universal Audio
-        "BlackRoosterAudio ", "BlackRoosterAudio_",
-        "Harrison_",
-        "iZ",              # iZotope hooks (iZVocalSynth2AUHook etc.)
-    ]
-    for prefix in vendor_prefixes:
-        if name.startswith(prefix):
-            name = name[len(prefix):]
-            break
+    # Fallback: clean up raw filename
+    name = raw_name
 
     # Replace underscores with spaces
     name = name.replace("_", " ")
@@ -55,27 +46,20 @@ def _make_display_name(raw_name: str) -> str:
     words = name.split()
     result = []
     for w in words:
-        # Already has uppercase letters (acronym/model) → keep as-is
         if any(c.isupper() for c in w) and len(w) > 1:
             result.append(w)
-        # All lowercase → title case
         elif w.islower():
             result.append(w.capitalize())
         else:
             result.append(w)
     name = " ".join(result)
 
-    # Fix common patterns: uppercase known acronyms
+    # Fix common audio acronyms
     for acronym in ["LA-2A", "LA-3A", "API", "SSL", "EQ", "VCA", "FET",
-                     "ATR", "VT", "HP", "LP", "DSP", "VST", "AU"]:
+                     "ATR", "VT", "HP", "LP", "DSP"]:
         name = re.sub(rf'\b{re.escape(acronym)}\b', acronym, name, flags=re.IGNORECASE)
-
-    # Fix known model name variants (no hyphens in filename)
     name = re.sub(r'\bla2a\b', 'LA-2A', name, flags=re.IGNORECASE)
     name = re.sub(r'\bla3a\b', 'LA-3A', name, flags=re.IGNORECASE)
-    name = re.sub(r'\bVoxbox\b', 'VoxBox', name)
-    name = re.sub(r'\bMk\b', 'MK', name)
-    name = re.sub(r'\bMkII\b', 'MKII', name)
 
     return name.strip()
 
@@ -94,7 +78,7 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
 
     Returns dict with 'developer' and 'plugin_type' keys (values may be None).
     """
-    result = {"developer": None, "plugin_type": None}
+    result = {"developer": None, "plugin_type": None, "plist_display_name": None}
     try:
         plist_path = os.path.join(bundle_path, "Contents", "Info.plist")
         if not os.path.isfile(plist_path):
@@ -112,9 +96,12 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
                 ac = audio_components[0]
                 ac_name = ac.get("name", "")
                 if ": " in ac_name:
-                    developer = ac_name.split(": ", 1)[0].strip()
+                    developer, plugin_display = ac_name.split(": ", 1)
+                    developer = developer.strip()
                     if len(developer) >= 2:
                         result["developer"] = developer
+                    if plugin_display.strip():
+                        result["plist_display_name"] = plugin_display.strip()
 
                 # Extract plugin_type from AU type code
                 au_type = ac.get("type", "")
@@ -234,7 +221,7 @@ def scan_plugins() -> list[dict]:
             is_own, own_brand = detect_own_plugin(name)
             meta = _extract_metadata_from_plist(full_path, fmt)
 
-            display_name = _make_display_name(name)
+            display_name = _make_display_name(name, meta.get("plist_display_name"))
 
             plugins.append({
                 "name": name,

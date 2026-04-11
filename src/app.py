@@ -5,10 +5,15 @@ REST API + WebSocket chat + CRUD for plugin management.
 
 import asyncio
 import json
+import os
 import sys
 import traceback
 from pathlib import Path
 from datetime import datetime
+
+# Kill ChromaDB telemetry before anything imports it
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
