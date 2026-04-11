@@ -66,8 +66,8 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
                 if au_type in _AU_TYPE_MAP:
                     result["plugin_type"] = _AU_TYPE_MAP[au_type]
 
-        # Priority 2: NSHumanReadableCopyright (skip for AAX - it's PACE wrapper)
-        if not result["developer"] and fmt != "AAX":
+        # Priority 2: NSHumanReadableCopyright
+        if not result["developer"]:
             copyright_str = plist.get("NSHumanReadableCopyright", "")
             if copyright_str:
                 dev = _clean_copyright(copyright_str)
@@ -75,14 +75,14 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
                     result["developer"] = dev
 
         # Priority 3: CFBundleIdentifier (com.DeveloperName.PluginName)
-        if not result["developer"] and fmt != "AAX":
+        if not result["developer"]:
             bundle_id = plist.get("CFBundleIdentifier", "")
             if bundle_id:
                 parts = bundle_id.split(".")
                 if len(parts) >= 3:
                     raw = parts[1]
                     if len(raw) >= 2 and raw.lower() not in (
-                        "vst3", "au", "plugin", "audio", "paceap",
+                        "vst3", "au", "plugin", "audio",
                     ):
                         dev = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", raw)
                         dev = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", dev)
@@ -194,7 +194,7 @@ def scan_plugins() -> list[dict]:
 
     # Cross-format metadata propagation:
     # AU has the richest metadata (developer + plugin_type).
-    # Propagate to VST3/AAX versions of the same plugin.
+    # Propagate to VST3 versions of the same plugin.
     _cross_reference_metadata(plugins)
 
     print(f"\n  Total plugins found: {len(plugins)}")
@@ -210,7 +210,7 @@ def scan_plugins() -> list[dict]:
 
 
 def _cross_reference_metadata(plugins: list[dict]):
-    """Propagate AU metadata (developer, plugin_type) to VST3/AAX with same name."""
+    """Propagate AU metadata (developer, plugin_type) to VST3 with same name."""
     # Build lookup from AU plugins (richest metadata)
     au_metadata = {}
     for p in plugins:

@@ -162,7 +162,7 @@ class EnrichmentOrchestrator:
         finally:
             conn.close()
 
-        # Deduplicate by name (AU+VST3+AAX = same plugin)
+        # Deduplicate by name (AU+VST3 = same plugin)
         seen_names = set()
         unique_plugins = []
         for p in plugins:
@@ -238,7 +238,7 @@ class EnrichmentOrchestrator:
         """
         conn = get_db()
         try:
-            # Find all rows with this name (AU + VST3 + AAX)
+            # Find all rows with this name (AU + VST3)
             rows = conn.execute(
                 "SELECT id, * FROM plugins WHERE LOWER(name) = ?",
                 (plugin_name.lower(),),

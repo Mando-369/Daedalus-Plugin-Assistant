@@ -1,11 +1,11 @@
 # Daedalus Plugin Assistant
 
-A local macOS application that manages, classifies, and provides intelligent search across your AU, VST3, and AAX audio plugin collection using autonomous AI agents and a local LLM via Ollama.
+A local macOS application that manages, classifies, and provides intelligent search across your AU and VST3 audio plugin collection using autonomous AI agents and a local LLM via Ollama.
 
 ## Features
 
-- **Automatic Plugin Discovery** -- Scans standard macOS plugin directories for AU, VST3, and AAX formats
-- **Metadata Extraction** -- Reads developer names and plugin types directly from bundle Info.plist files, with cross-format propagation (AU metadata shared to VST3/AAX)
+- **Automatic Plugin Discovery** -- Scans standard macOS plugin directories for AU and VST3 formats
+- **Metadata Extraction** -- Reads developer names and plugin types directly from bundle Info.plist files, with cross-format propagation (AU metadata shared to VST3)
 - **Static Classification** -- 1000+ known plugins pre-classified with developer, category, character, and use case data
 - **Autonomous AI Enrichment** -- Goal-oriented agents with LLM tool-calling that research plugins autonomously:
   - **Product Info Agent** -- Finds developer, category, description, hardware emulation details from product pages and KVR
@@ -75,10 +75,10 @@ SearXNG is a web service that proxies searches to Google, Bing, and others. Dock
 
 ### Scanning Plugins
 
-Click **Rescan Plugins** to discover all installed AU, VST3, and AAX plugins. The scanner:
+Click **Rescan Plugins** to discover all installed AU and VST3 plugins. The scanner:
 1. Reads plugin directories on disk
 2. Extracts developer and plugin type from bundle metadata (Info.plist)
-3. Cross-references AU metadata to VST3/AAX versions of the same plugin
+3. Cross-references AU metadata to VST3 versions of the same plugin
 4. Runs static classification against 1000+ known plugins
 5. Builds vector embeddings for semantic search
 6. Detects newly installed plugins and reports them for enrichment
@@ -127,7 +127,7 @@ Key settings in `config.py`:
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API endpoint |
 | `SEARXNG_URL` | `http://127.0.0.1:8888` | SearXNG instance URL |
 | `WEB_PORT` | `8777` | Web server port |
-| `PLUGIN_SCAN_DIRS` | Standard macOS paths | Directories to scan for AU, VST3, AAX plugins |
+| `PLUGIN_SCAN_DIRS` | Standard macOS paths | Directories to scan for AU, VST3 plugins |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Model for semantic search embeddings |
 | `RAG_MAX_CONTEXT_PLUGINS` | `20` | Max plugins included in LLM context |
 | `OWN_PLUGIN_BRANDS` | `{}` | Your own plugin brand names for detection |
@@ -136,7 +136,7 @@ Key settings in `config.py`:
 
 ```
                         Plugin directories on disk
-                         (AU, VST3, AAX bundles)
+                         (AU, VST3 bundles)
                                   |
                                   v
                          scan_plugins() + plist
