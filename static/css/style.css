@@ -278,6 +278,34 @@ body {
     color: white;
 }
 
+/* Markdown rendering in chat messages */
+.msg-text h2, .msg-text h3, .msg-text h4 {
+    margin: 12px 0 6px 0;
+    color: var(--text-primary);
+}
+.msg-text h2 { font-size: 1.2em; }
+.msg-text h3 { font-size: 1.1em; }
+.msg-text h4 { font-size: 1em; }
+.msg-text p { margin: 6px 0; }
+.msg-text ul { margin: 6px 0; padding-left: 20px; }
+.msg-text li { margin: 3px 0; }
+.msg-text code {
+    background: var(--bg-tertiary);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+.msg-text pre {
+    background: var(--bg-tertiary);
+    padding: 10px;
+    border-radius: var(--radius);
+    overflow-x: auto;
+    margin: 8px 0;
+}
+.msg-text pre code { background: none; padding: 0; }
+.msg-text strong { color: var(--text-primary); }
+.msg-text hr { border: none; border-top: 1px solid var(--border-color); margin: 12px 0; }
+
 .msg-sources {
     display: flex;
     flex-wrap: wrap;

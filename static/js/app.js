@@ -159,6 +159,12 @@ const App = (() => {
                     // Remove status
                     const status = currentAssistantEl.querySelector('.msg-status');
                     if (status) status.remove();
+
+                    // Render markdown in the response
+                    const msgText = currentAssistantEl.querySelector('.msg-text');
+                    const rawText = msgText.textContent;
+                    msgText.innerHTML = renderMarkdown(rawText);
+
                     // Add sources
                     if (currentAssistantEl._sources && currentAssistantEl._sources.length) {
                         const body = currentAssistantEl.querySelector('.msg-body');
@@ -173,8 +179,7 @@ const App = (() => {
                         body.appendChild(sourcesDiv);
                     }
                     // Store in history (answer only, not thinking)
-                    const text = currentAssistantEl.querySelector('.msg-text').textContent;
-                    chatHistory.push({ role: 'assistant', content: text });
+                    chatHistory.push({ role: 'assistant', content: rawText });
                     currentAssistantEl = null;
                 }
                 break;
@@ -727,6 +732,60 @@ const App = (() => {
             btn.disabled = false;
             btn.textContent = 'Enrich with Web Search';
         };
+    }
+
+    // ── Markdown Rendering ───────────────────────
+    function renderMarkdown(text) {
+        // Escape HTML first
+        let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // Code blocks (```...```)
+        html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+
+        // Inline code (`...`)
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Headers (### > ## > #)
+        html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+        html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
+        // Horizontal rules
+        html = html.replace(/^---+$/gm, '<hr>');
+
+        // Bold and italic
+        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Unordered lists (- or *)
+        html = html.replace(/^[\s]*[-*] (.+)$/gm, '<li>$1</li>');
+
+        // Ordered lists (1. 2. etc.)
+        html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+        // Wrap consecutive <li> in <ul>
+        html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+        // Paragraphs: double newlines
+        html = html.replace(/\n\n+/g, '</p><p>');
+        // Single newlines within paragraphs
+        html = html.replace(/\n/g, '<br>');
+
+        // Wrap in paragraph tags
+        html = '<p>' + html + '</p>';
+
+        // Clean up empty paragraphs and fix nesting
+        html = html.replace(/<p>\s*<\/p>/g, '');
+        html = html.replace(/<p>\s*(<h[234]>)/g, '$1');
+        html = html.replace(/(<\/h[234]>)\s*<\/p>/g, '$1');
+        html = html.replace(/<p>\s*(<ul>)/g, '$1');
+        html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
+        html = html.replace(/<p>\s*(<pre>)/g, '$1');
+        html = html.replace(/(<\/pre>)\s*<\/p>/g, '$1');
+        html = html.replace(/<p>\s*(<hr>)\s*<\/p>/g, '$1');
+
+        return html;
     }
 
     // ── Utilities ───────────────────────────────
