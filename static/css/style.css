@@ -539,6 +539,19 @@ body {
     font-size: var(--font-size-sm);
 }
 
+.review-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.enrich-status {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── Stats ─────────────────────────────────── */
 
 .stats-grid {

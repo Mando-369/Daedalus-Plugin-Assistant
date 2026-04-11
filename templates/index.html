@@ -86,6 +86,12 @@
             <div class="review-header">
                 <h2>Plugins Needing Review</h2>
                 <p class="subtitle">These plugins were auto-classified with low confidence or left unclassified. Click to edit.</p>
+                <div class="review-actions">
+                    <button class="btn btn-accent" onclick="App.startEnrichment()" id="enrich-btn">
+                        Enrich with Web Search
+                    </button>
+                    <span id="enrich-status" class="enrich-status"></span>
+                </div>
             </div>
             <div id="review-list" class="plugin-grid"></div>
             <div id="review-pagination" class="pagination"></div>

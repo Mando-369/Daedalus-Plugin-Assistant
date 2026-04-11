@@ -604,6 +604,65 @@ const App = (() => {
         }
     }
 
+    // ── Enrichment ──────────────────────────────
+    function startEnrichment() {
+        const btn = document.getElementById('enrich-btn');
+        const status = document.getElementById('enrich-status');
+
+        btn.disabled = true;
+        btn.textContent = 'Enriching...';
+        status.textContent = 'Connecting...';
+
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const enrichWs = new WebSocket(`${proto}//${location.host}/ws/enrich`);
+
+        enrichWs.onopen = () => {
+            enrichWs.send(JSON.stringify({}));
+        };
+
+        enrichWs.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.error) {
+                status.textContent = `Error: ${data.error}`;
+                btn.disabled = false;
+                btn.textContent = 'Enrich with Web Search';
+                return;
+            }
+
+            const stats = data.stats || {};
+            if (data.done) {
+                status.textContent =
+                    `Done! ${stats.enriched || 0} enriched, ${stats.unknown || 0} unknown, ${stats.errors || 0} errors`;
+                btn.disabled = false;
+                btn.textContent = 'Enrich with Web Search';
+                enrichWs.close();
+
+                // Refresh views
+                loadReviewPlugins(1);
+                loadReviewBadge();
+                loadStats();
+                loadFilters();
+            } else {
+                const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
+                status.textContent =
+                    `${data.processed}/${data.total} (${pct}%) — ${data.current || 'searching...'}` +
+                    ` | enriched: ${stats.enriched || 0}`;
+            }
+        };
+
+        enrichWs.onerror = () => {
+            status.textContent = 'WebSocket error';
+            btn.disabled = false;
+            btn.textContent = 'Enrich with Web Search';
+        };
+
+        enrichWs.onclose = () => {
+            btn.disabled = false;
+            btn.textContent = 'Enrich with Web Search';
+        };
+    }
+
     // ── Utilities ───────────────────────────────
     function escapeHtml(text) {
         const div = document.createElement('div');
@@ -627,6 +686,7 @@ const App = (() => {
         closeModal,
         savePlugin,
         triggerScan,
+        startEnrichment,
         _paginate,
     };
 })();

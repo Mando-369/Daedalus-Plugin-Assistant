@@ -540,6 +540,78 @@ async def trigger_scan():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Enrichment API ────────────────────────────────
+
+@app.websocket("/ws/enrich")
+async def websocket_enrich(websocket: WebSocket):
+    """WebSocket endpoint for streaming enrichment progress."""
+    await websocket.accept()
+
+    try:
+        data = await websocket.receive_text()
+        msg = json.loads(data)
+        limit = msg.get("limit")
+
+        from src.enrichment import PluginEnrichmentService
+        service = PluginEnrichmentService()
+
+        for progress in service.enrich_all(limit=limit):
+            await websocket.send_json(progress)
+
+        # Re-embed all plugins after enrichment
+        await websocket.send_json({
+            "processed": progress["total"],
+            "total": progress["total"],
+            "current": "Re-embedding plugins...",
+            "stats": progress["stats"],
+            "done": False,
+        })
+
+        conn = get_db()
+        try:
+            all_plugins = [dict(r) for r in conn.execute("SELECT * FROM plugins").fetchall()]
+        finally:
+            conn.close()
+
+        store = get_embeddings()
+        store.delete_all()
+        store.upsert_plugins(all_plugins)
+
+        await websocket.send_json({
+            "processed": progress["total"],
+            "total": progress["total"],
+            "current": "",
+            "stats": progress["stats"],
+            "done": True,
+        })
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        traceback.print_exc()
+        try:
+            await websocket.send_json({"error": str(e), "done": True})
+        except Exception:
+            pass
+
+
+@app.get("/api/enrichment/status")
+async def enrichment_status():
+    """Check how many plugins need enrichment."""
+    conn = get_db()
+    try:
+        needs = conn.execute("""
+            SELECT COUNT(DISTINCT LOWER(name)) as count
+            FROM plugins
+            WHERE classification_confidence IN ('unclassified', 'low')
+               OR developer IS NULL OR developer = ''
+               OR description IS NULL OR description = ''
+        """).fetchone()["count"]
+        return {"needs_enrichment": needs}
+    finally:
+        conn.close()
+
+
 # ── Startup ────────────────────────────────────────
 
 @app.on_event("startup")
