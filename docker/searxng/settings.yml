@@ -1,0 +1,27 @@
+use_default_settings: true
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "daedalus-plugin-assistant-searxng"
+  limiter: false
+
+engines:
+  - name: google
+    engine: google
+    shortcut: g
+
+  - name: bing
+    engine: bing
+    shortcut: b
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+
+  - name: brave
+    engine: brave
+    shortcut: br

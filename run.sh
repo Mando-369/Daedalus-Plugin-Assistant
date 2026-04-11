@@ -134,10 +134,11 @@ elif command -v docker &>/dev/null; then
         fi
     else
         echo -e "  Creating SearXNG container..."
+        SEARXNG_CONF="$SCRIPT_DIR/docker/searxng/settings.yml"
         docker run -d --name searxng -p 8888:8080 \
-            -e SEARXNG_SECRET="$(openssl rand -hex 32)" \
+            -v "${SEARXNG_CONF}:/etc/searxng/settings.yml:ro" \
             searxng/searxng >/dev/null 2>&1
-        sleep 3
+        sleep 5
         if curl -s "${SEARXNG_URL}" >/dev/null 2>&1; then
             echo -e "${GREEN}  ✓ SearXNG installed and started${NC}"
         else
