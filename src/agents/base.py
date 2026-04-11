@@ -100,6 +100,31 @@ class AgentRunner:
             content = msg.get("content", "")
             if content:
                 parsed = self._parse_json(content)
+
+                # Quality check: if most fields are null and we have iterations
+                # left, push the agent to try harder
+                if iteration < self.max_iterations - 1 and self._is_thin_result(parsed):
+                    messages.append(msg)
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Your result has too many null/empty fields. "
+                            "Try a different search strategy:\n"
+                            "- Use different search terms or phrasing\n"
+                            "- Try site-specific queries (site:kvraudio.com, site:gearspace.com)\n"
+                            "- Fetch a promising URL you found earlier\n"
+                            "- Search for the developer name + plugin name together\n"
+                            "Keep searching until you find more information, then return an updated JSON."
+                        ),
+                    })
+                    if on_step:
+                        on_step("quality_check", {
+                            "filled": sum(1 for v in parsed.values() if v),
+                            "total": len(parsed),
+                            "retrying": True,
+                        })
+                    continue
+
                 if on_step:
                     on_step("answer", parsed)
                 return parsed
@@ -139,6 +164,16 @@ class AgentRunner:
             resp = client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             resp.raise_for_status()
             return resp.json()
+
+    @staticmethod
+    def _is_thin_result(result: dict) -> bool:
+        """Check if a result has too many null/empty fields to be useful."""
+        if not result:
+            return True
+        total = len(result)
+        filled = sum(1 for v in result.values() if v and str(v).strip())
+        # Consider thin if less than 40% of fields are filled
+        return total > 0 and (filled / total) < 0.4
 
     @staticmethod
     def _parse_json(text: str) -> dict:

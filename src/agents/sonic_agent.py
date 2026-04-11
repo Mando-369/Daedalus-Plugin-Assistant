@@ -29,10 +29,17 @@ SEARCH STRATEGY:
 4. Fetch pages with real user opinions (not marketing copy)
 5. Focus on what USERS and ENGINEERS say, not manufacturer descriptions
 
+QUALITY CHECK before returning:
+- Count how many fields you can fill. If more than half are null, you need more research.
+- Try different search queries: add "review", "vs", "comparison", "tips", "forum"
+- Try site-specific: site:kvraudio.com, site:gearspace.com, site:reddit.com
+- If a page returned 403, try a different URL or search query.
+- Only return a mostly-empty result if you've exhausted your search options.
+
 IMPORTANT:
 - Report what real users say, not marketing claims.
 - Hidden tips should be practical, actionable advice from experienced users.
-- Set any field you cannot find real user opinions about to null.
+- Set any field you genuinely cannot find real user opinions about to null.
 - Return ONLY a JSON object, no explanation text."""
 
 

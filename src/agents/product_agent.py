@@ -29,9 +29,15 @@ SEARCH STRATEGY:
 4. Fetch the most promising result page to get full product details
 5. Prioritize official/authoritative sources over user opinions
 
+QUALITY CHECK before returning:
+- Count how many fields you can fill. If more than half are null, you need more research.
+- Try different search queries: add the developer name, try "review", try site:kvraudio.com
+- Fetch at least one promising page before giving up.
+- Only return a mostly-empty result if you've exhausted your search options.
+
 IMPORTANT:
 - Be factual. Only report what you find, don't guess.
-- Set any field you cannot confirm to null.
+- Set any field you genuinely cannot confirm to null.
 - Return ONLY a JSON object, no explanation text."""
 
 
