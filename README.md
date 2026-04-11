@@ -5,7 +5,7 @@ A local macOS application that manages, classifies, and provides intelligent sea
 ## Features
 
 - **Automatic Plugin Discovery** -- Scans standard macOS plugin directories for AU and VST3 formats
-- **Metadata Extraction** -- Reads developer names and plugin types directly from bundle Info.plist files, with cross-format propagation (AU metadata shared to VST3)
+- **Metadata Extraction** -- Reads developer names, plugin types, and display names directly from bundle Info.plist files, with cross-format propagation (AU metadata shared to VST3). Display names come from the developer's own naming, not filename heuristics.
 - **Static Classification** -- 1000+ known plugins pre-classified with developer, category, character, and use case data
 - **Autonomous AI Enrichment** -- Goal-oriented agents with LLM tool-calling that research plugins autonomously:
   - **Product Info Agent** -- Finds developer, category, description, hardware emulation details from product pages and KVR
@@ -13,6 +13,7 @@ A local macOS application that manages, classifies, and provides intelligent sea
   - **Quality self-check** -- Agents evaluate their own results and retry with different search strategies if data is thin
 - **SearXNG Search** -- Self-hosted metasearch engine (Docker) aggregating Google, Bing, Brave, and DuckDuckGo without rate limits. Falls back to DuckDuckGo if not running.
 - **RAG-Powered Chat** -- Ask natural language questions about your plugins with hybrid SQL + semantic search, markdown-rendered responses, and persistent multi-conversation history
+- **Search Online in Chat** -- Per-response "Search Online" button to enrich answers with live web results, plus a global search button to query the web directly from the chat input
 - **Per-Plugin Enrichment** -- Enrich individual plugins with optional user-provided URLs or PDF manuals
 - **Bulk Enrichment** -- Batch-process all unclassified plugins with streaming progress
 - **Chat History** -- SQLite-backed multi-conversation history with sidebar, search, and individual delete
@@ -70,6 +71,10 @@ python -m uvicorn src.app:app --host 127.0.0.1 --port 8777
 ### Why SearXNG runs in Docker
 
 SearXNG is a web service that proxies searches to Google, Bing, and others. Docker keeps it cleanly isolated -- no system pollution, no Python conflicts with the app, easy to remove (`docker rm searxng`), and simple to restart. It runs locally; no data leaves your machine beyond the search queries themselves.
+
+### Privacy
+
+Everything runs locally. Ollama runs on your machine, the database is local SQLite, embeddings are computed locally, and SearXNG is a self-hosted search proxy. ChromaDB telemetry is disabled -- no analytics or data collection of any kind.
 
 ## Usage
 
