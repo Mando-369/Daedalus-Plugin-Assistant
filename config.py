@@ -106,18 +106,14 @@ PLUGIN_SCAN_DIRS = [
         "scope": "user",
         "extension": ".vst3",
     },
-    {
-        "path": "/Library/Application Support/Avid/Audio/Plug-Ins",
-        "format": "AAX",
-        "scope": "system",
-        "extension": ".aaxplugin",
-    },
-    {
-        "path": os.path.expanduser("~/Library/Application Support/Avid/Audio/Plug-Ins"),
-        "format": "AAX",
-        "scope": "user",
-        "extension": ".aaxplugin",
-    },
+    # AAX disabled: PACE DRM wrapper mangles plugin names (e.g., "AK9Xigned")
+    # and plists contain no useful metadata. AU + VST3 cover the same plugins.
+    # {
+    #     "path": "/Library/Application Support/Avid/Audio/Plug-Ins",
+    #     "format": "AAX",
+    #     "scope": "system",
+    #     "extension": ".aaxplugin",
+    # },
 ]
 
 # ──────────────────────────────────────────────
