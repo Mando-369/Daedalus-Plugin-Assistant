@@ -159,7 +159,7 @@ class AgentRunner:
             payload["tools"] = self.tools
 
         with httpx.Client(
-            timeout=httpx.Timeout(connect=10, read=120, write=10, pool=10)
+            timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)
         ) as client:
             resp = client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
             resp.raise_for_status()

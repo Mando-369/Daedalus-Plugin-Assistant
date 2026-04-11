@@ -14,7 +14,7 @@ import httpx
 # ── Rate limiting ────────────────────────────────
 
 _last_search_time = 0.0
-_SEARCH_DELAY = 2.0  # seconds between DuckDuckGo requests
+_SEARCH_DELAY = 4.0  # seconds between DuckDuckGo requests (avoid rate limiting)
 
 
 # ── Tool Implementations ────────────────────────
