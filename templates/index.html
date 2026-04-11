@@ -32,22 +32,34 @@
 
         <!-- ════════════════ CHAT TAB ════════════════ -->
         <div id="tab-chat" class="tab-content active">
-            <div class="chat-container">
-                <div id="chat-messages" class="chat-messages">
-                    <div class="chat-welcome">
-                        <p>I'm Daedalus — ask me anything about your plugin collection.</p>
-                        <div class="suggestions">
-                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">What compressors do I have?</button>
-                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Find something warm for vocals</button>
-                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Which plugins emulate analog hardware?</button>
-                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Show me my own plugins</button>
+            <div class="chat-layout">
+                <!-- Conversation Sidebar -->
+                <div class="chat-sidebar">
+                    <div class="sidebar-header">
+                        <button class="btn btn-sm btn-accent" onclick="App.newConversation()">+ New Chat</button>
+                        <input type="text" id="conv-search" placeholder="Search..."
+                            oninput="App.searchConversations()">
+                    </div>
+                    <div id="conv-list" class="conv-list"></div>
+                </div>
+                <!-- Chat Area -->
+                <div class="chat-container">
+                    <div id="chat-messages" class="chat-messages">
+                        <div class="chat-welcome">
+                            <p>I'm Daedalus -- ask me anything about your plugin collection.</p>
+                            <div class="suggestions">
+                                <button class="suggestion-chip" onclick="App.sendSuggestion(this)">What compressors do I have?</button>
+                                <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Find something warm for vocals</button>
+                                <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Which plugins emulate analog hardware?</button>
+                                <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Show me my own plugins</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="chat-input-area">
-                    <textarea id="chat-input" placeholder="Ask about your plugins..." rows="1"
-                        onkeydown="App.handleChatKey(event)"></textarea>
-                    <button id="btn-send" class="btn btn-primary" onclick="App.sendMessage()">Send</button>
+                    <div class="chat-input-area">
+                        <textarea id="chat-input" placeholder="Ask about your plugins..." rows="1"
+                            onkeydown="App.handleChatKey(event)"></textarea>
+                        <button id="btn-send" class="btn btn-primary" onclick="App.sendMessage()">Send</button>
+                    </div>
                 </div>
             </div>
         </div>

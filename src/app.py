@@ -276,6 +276,102 @@ async def update_plugin(plugin_id: int, update: PluginUpdate):
         conn.close()
 
 
+# ── Conversations API ─────────────────────────────
+
+@app.get("/api/conversations")
+async def list_conversations(search: str = None):
+    """List all conversations, optionally filtered by search."""
+    conn = get_db()
+    try:
+        if search:
+            rows = conn.execute("""
+                SELECT DISTINCT c.* FROM conversations c
+                LEFT JOIN messages m ON m.conversation_id = c.id
+                WHERE c.title LIKE ? OR m.content LIKE ?
+                ORDER BY c.updated_at DESC
+            """, (f"%{search}%", f"%{search}%")).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM conversations ORDER BY updated_at DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/api/conversations")
+async def create_conversation():
+    """Create a new conversation."""
+    conn = get_db()
+    try:
+        cursor = conn.execute("INSERT INTO conversations (title) VALUES ('New Chat')")
+        conn.commit()
+        conv_id = cursor.lastrowid
+        row = conn.execute("SELECT * FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+        return dict(row)
+    finally:
+        conn.close()
+
+
+@app.get("/api/conversations/{conv_id}/messages")
+async def get_messages(conv_id: int):
+    """Get all messages in a conversation."""
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at",
+            (conv_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/api/conversations/{conv_id}/messages")
+async def add_message(conv_id: int, message: dict):
+    """Add a message to a conversation and auto-title if first user message."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO messages (conversation_id, role, content) VALUES (?, ?, ?)",
+            (conv_id, message["role"], message["content"]),
+        )
+        # Auto-title from first user message
+        if message["role"] == "user":
+            conv = conn.execute(
+                "SELECT title FROM conversations WHERE id = ?", (conv_id,)
+            ).fetchone()
+            if conv and conv["title"] == "New Chat":
+                title = message["content"][:50]
+                if len(message["content"]) > 50:
+                    title += "..."
+                conn.execute(
+                    "UPDATE conversations SET title = ? WHERE id = ?",
+                    (title, conv_id),
+                )
+        conn.execute(
+            "UPDATE conversations SET updated_at = datetime('now') WHERE id = ?",
+            (conv_id,),
+        )
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/conversations/{conv_id}")
+async def delete_conversation(conv_id: int):
+    """Delete a conversation and its messages."""
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM messages WHERE conversation_id = ?", (conv_id,))
+        conn.execute("DELETE FROM conversations WHERE id = ?", (conv_id,))
+        conn.commit()
+        return {"status": "deleted"}
+    finally:
+        conn.close()
+
+
 # ── Metadata API ───────────────────────────────────
 
 @app.get("/api/categories")
@@ -413,6 +509,25 @@ async def websocket_chat(websocket: WebSocket):
             msg = json.loads(data)
             user_query = msg.get("message", "")
             history = msg.get("history", [])
+            conv_id = msg.get("conversation_id")
+
+            # Save user message to conversation
+            if conv_id:
+                conn = get_db()
+                try:
+                    conn.execute(
+                        "INSERT INTO messages (conversation_id, role, content) VALUES (?, 'user', ?)",
+                        (conv_id, user_query),
+                    )
+                    # Auto-title from first message
+                    conv = conn.execute("SELECT title FROM conversations WHERE id = ?", (conv_id,)).fetchone()
+                    if conv and conv["title"] == "New Chat":
+                        title = user_query[:50] + ("..." if len(user_query) > 50 else "")
+                        conn.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, conv_id))
+                    conn.execute("UPDATE conversations SET updated_at = datetime('now') WHERE id = ?", (conv_id,))
+                    conn.commit()
+                finally:
+                    conn.close()
 
             try:
                 rag = get_rag()
@@ -446,11 +561,26 @@ async def websocket_chat(websocket: WebSocket):
                     "content": "Generating response..."
                 })
 
+                full_response = []
                 async for token_type, token_text in rag.async_generate_stream(user_query, context, history):
                     await websocket.send_json({
-                        "type": token_type,  # "thinking" or "content"
+                        "type": token_type,
                         "content": token_text,
                     })
+                    if token_type == "content":
+                        full_response.append(token_text)
+
+                # Save assistant response to conversation
+                if conv_id and full_response:
+                    conn = get_db()
+                    try:
+                        conn.execute(
+                            "INSERT INTO messages (conversation_id, role, content) VALUES (?, 'assistant', ?)",
+                            (conv_id, "".join(full_response)),
+                        )
+                        conn.commit()
+                    finally:
+                        conn.close()
 
                 await websocket.send_json({"type": "done"})
 

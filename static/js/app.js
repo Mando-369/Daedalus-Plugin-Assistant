@@ -10,6 +10,7 @@ const App = (() => {
     let currentPage = 1;
     let reviewPage = 1;
     let debounceTimer = null;
+    let currentConversationId = null;
 
     // ── Initialization ──────────────────────────
     function init() {
@@ -17,6 +18,7 @@ const App = (() => {
         loadFilters();
         loadStats();
         loadReviewBadge();
+        loadConversations();
     }
 
     function connectWebSocket() {
@@ -45,10 +47,15 @@ const App = (() => {
     }
 
     // ── Chat ────────────────────────────────────
-    function sendMessage() {
+    async function sendMessage() {
         const input = document.getElementById('chat-input');
         const text = input.value.trim();
         if (!text) return;
+
+        // Auto-create conversation if none active
+        if (!currentConversationId) {
+            await newConversation();
+        }
 
         // Clear welcome message on first send
         const welcome = document.querySelector('.chat-welcome');
@@ -63,16 +70,18 @@ const App = (() => {
             ws.send(JSON.stringify({
                 message: text,
                 history: chatHistory.slice(-6),
+                conversation_id: currentConversationId,
             }));
             // Create placeholder for assistant response
             appendChatMessage('assistant', '', true);
         } else {
-            // Fallback to REST
             fetchChat(text);
         }
 
         input.value = '';
         input.style.height = 'auto';
+        // Refresh sidebar to show updated title
+        loadConversations();
     }
 
     function sendSuggestion(el) {
@@ -588,6 +597,115 @@ const App = (() => {
         }
     }
 
+    // ── Conversations ──────────────────────────
+    async function loadConversations(search = null) {
+        try {
+            const q = search ? `?search=${encodeURIComponent(search)}` : '';
+            const resp = await fetch(`/api/conversations${q}`);
+            const convs = await resp.json();
+            const list = document.getElementById('conv-list');
+            if (!convs.length) {
+                list.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:var(--font-size-sm)">No conversations yet</div>';
+                return;
+            }
+            list.innerHTML = convs.map(c => {
+                const active = c.id === currentConversationId ? ' active' : '';
+                const date = new Date(c.updated_at + 'Z').toLocaleDateString();
+                return `
+                    <div class="conv-item${active}" onclick="App.switchConversation(${c.id})">
+                        <span class="conv-item-title">${esc(c.title)}</span>
+                        <span class="conv-item-date">${date}</span>
+                        <button class="conv-item-delete" onclick="event.stopPropagation(); App.deleteConversation(${c.id})" title="Delete">&times;</button>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            console.error('Failed to load conversations:', e);
+        }
+    }
+
+    async function newConversation() {
+        try {
+            const resp = await fetch('/api/conversations', { method: 'POST' });
+            const conv = await resp.json();
+            currentConversationId = conv.id;
+            chatHistory = [];
+            // Clear chat area
+            const msgs = document.getElementById('chat-messages');
+            msgs.innerHTML = `
+                <div class="chat-welcome">
+                    <p>I'm Daedalus -- ask me anything about your plugin collection.</p>
+                    <div class="suggestions">
+                        <button class="suggestion-chip" onclick="App.sendSuggestion(this)">What compressors do I have?</button>
+                        <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Find something warm for vocals</button>
+                        <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Which plugins emulate analog hardware?</button>
+                        <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Show me my own plugins</button>
+                    </div>
+                </div>
+            `;
+            loadConversations();
+        } catch (e) {
+            console.error('Failed to create conversation:', e);
+        }
+    }
+
+    async function switchConversation(convId) {
+        currentConversationId = convId;
+        chatHistory = [];
+        try {
+            const resp = await fetch(`/api/conversations/${convId}/messages`);
+            const messages = await resp.json();
+            const msgs = document.getElementById('chat-messages');
+            msgs.innerHTML = '';
+            messages.forEach(m => {
+                if (m.role === 'user') {
+                    appendChatMessage('user', m.content);
+                    chatHistory.push({ role: 'user', content: m.content });
+                } else {
+                    appendChatMessage('assistant', m.content);
+                    // Render markdown on loaded messages
+                    const lastMsg = msgs.querySelector('.chat-msg:last-child .msg-text');
+                    if (lastMsg) lastMsg.innerHTML = renderMarkdown(m.content);
+                    chatHistory.push({ role: 'assistant', content: m.content });
+                }
+            });
+            if (!messages.length) {
+                msgs.innerHTML = `
+                    <div class="chat-welcome">
+                        <p>I'm Daedalus -- ask me anything about your plugin collection.</p>
+                    </div>
+                `;
+            }
+            scrollChat();
+            loadConversations();
+        } catch (e) {
+            console.error('Failed to load conversation:', e);
+        }
+    }
+
+    async function deleteConversation(convId) {
+        try {
+            await fetch(`/api/conversations/${convId}`, { method: 'DELETE' });
+            if (currentConversationId === convId) {
+                currentConversationId = null;
+                chatHistory = [];
+                document.getElementById('chat-messages').innerHTML = `
+                    <div class="chat-welcome">
+                        <p>I'm Daedalus -- ask me anything about your plugin collection.</p>
+                    </div>
+                `;
+            }
+            loadConversations();
+        } catch (e) {
+            console.error('Failed to delete conversation:', e);
+        }
+    }
+
+    function searchConversations() {
+        const q = document.getElementById('conv-search').value.trim();
+        loadConversations(q || null);
+    }
+
     // ── Per-Plugin Enrichment ───────────────────
     async function enrichSingle() {
         const id = document.getElementById('edit-id').value;
@@ -813,6 +931,10 @@ const App = (() => {
         triggerScan,
         startEnrichment,
         enrichSingle,
+        newConversation,
+        switchConversation,
+        deleteConversation,
+        searchConversations,
         _paginate,
     };
 })();

@@ -183,11 +183,105 @@ body {
 
 /* ── Chat ──────────────────────────────────── */
 
-.chat-container {
+.chat-layout {
     display: flex;
-    flex-direction: column;
     height: calc(100vh - 200px);
     min-height: 400px;
+    gap: 1px;
+    background: var(--border-color);
+}
+
+.chat-sidebar {
+    width: 240px;
+    min-width: 240px;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-header {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header input {
+    padding: 5px 8px;
+    font-size: var(--font-size-sm);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+}
+
+.conv-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.conv-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    transition: background 0.15s;
+}
+
+.conv-item:hover {
+    background: var(--bg-secondary);
+}
+
+.conv-item.active {
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent);
+}
+
+.conv-item-title {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.conv-item-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.conv-item-delete {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.conv-item:hover .conv-item-delete {
+    opacity: 1;
+}
+
+.conv-item-delete:hover {
+    color: var(--error);
+}
+
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    min-width: 0;
 }
 
 .chat-messages {

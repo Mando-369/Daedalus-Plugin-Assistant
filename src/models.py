@@ -220,6 +220,25 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_plugins_type ON plugins(plugin_type);
     CREATE INDEX IF NOT EXISTS idx_plugins_is_own ON plugins(is_own_plugin);
     CREATE INDEX IF NOT EXISTS idx_plugins_needs_review ON plugins(needs_review);
+
+    -- Chat history
+    CREATE TABLE IF NOT EXISTS conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT DEFAULT 'New Chat',
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
     """)
 
     # Migrate existing databases: add new columns if missing
