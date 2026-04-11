@@ -629,10 +629,12 @@ async def trigger_scan():
 
                     extra_sets = []
                     extra_vals = []
-                    if p.get("developer") and not existing_row["developer"]:
+                    # Plist-extracted developer is ground truth -- always update
+                    if p.get("developer") and p["developer"] != existing_row["developer"]:
                         extra_sets.append("developer = ?")
                         extra_vals.append(p["developer"])
-                    if p.get("plugin_type") and not existing_row["plugin_type"]:
+                    # Same for plugin_type from AU type codes
+                    if p.get("plugin_type") and p["plugin_type"] != existing_row["plugin_type"]:
                         extra_sets.append("plugin_type = ?")
                         extra_vals.append(p["plugin_type"])
 
