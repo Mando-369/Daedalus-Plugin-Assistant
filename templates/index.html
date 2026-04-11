@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1 class="app-title">{{ title }}</h1>
+            <div class="header-actions">
+                <button id="btn-scan" class="btn btn-accent" onclick="App.triggerScan()">
+                    Rescan Plugins
+                </button>
+                <span id="scan-status" class="status-text"></span>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="chat" onclick="App.switchTab('chat')">Chat</button>
+            <button class="tab-btn" data-tab="browse" onclick="App.switchTab('browse')">Browse</button>
+            <button class="tab-btn" data-tab="review" onclick="App.switchTab('review')">
+                Review <span id="review-badge" class="badge hidden">0</span>
+            </button>
+            <button class="tab-btn" data-tab="stats" onclick="App.switchTab('stats')">Stats</button>
+        </nav>
+
+        <!-- ════════════════ CHAT TAB ════════════════ -->
+        <div id="tab-chat" class="tab-content active">
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="chat-welcome">
+                        <p>I'm Daedalus — ask me anything about your plugin collection.</p>
+                        <div class="suggestions">
+                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">What compressors do I have?</button>
+                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Find something warm for vocals</button>
+                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Which plugins emulate analog hardware?</button>
+                            <button class="suggestion-chip" onclick="App.sendSuggestion(this)">Show me my own plugins</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="chat-input" placeholder="Ask about your plugins..." rows="1"
+                        onkeydown="App.handleChatKey(event)"></textarea>
+                    <button id="btn-send" class="btn btn-primary" onclick="App.sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════════════════ BROWSE TAB ════════════════ -->
+        <div id="tab-browse" class="tab-content">
+            <div class="browse-toolbar">
+                <input type="text" id="browse-search" placeholder="Search plugins..."
+                    oninput="App.debouncedBrowse()">
+                <select id="filter-category" onchange="App.loadPlugins()">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="filter-type" onchange="App.loadPlugins()">
+                    <option value="">All Types</option>
+                    <option value="instrument">Instruments</option>
+                    <option value="effect">Effects</option>
+                </select>
+                <select id="filter-developer" onchange="App.loadPlugins()">
+                    <option value="">All Developers</option>
+                </select>
+                <select id="filter-format" onchange="App.loadPlugins()">
+                    <option value="">All Formats</option>
+                    <option value="AU">AU</option>
+                    <option value="VST3">VST3</option>
+                </select>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-own" onchange="App.loadPlugins()"> My plugins
+                </label>
+            </div>
+            <div id="browse-info" class="browse-info"></div>
+            <div id="plugin-list" class="plugin-grid"></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+        <!-- ════════════════ REVIEW TAB ════════════════ -->
+        <div id="tab-review" class="tab-content">
+            <div class="review-header">
+                <h2>Plugins Needing Review</h2>
+                <p class="subtitle">These plugins were auto-classified with low confidence or left unclassified. Click to edit.</p>
+            </div>
+            <div id="review-list" class="plugin-grid"></div>
+            <div id="review-pagination" class="pagination"></div>
+        </div>
+
+        <!-- ════════════════ STATS TAB ════════════════ -->
+        <div id="tab-stats" class="tab-content">
+            <div class="stats-grid" id="stats-container">
+                <p class="loading-text">Loading statistics...</p>
+            </div>
+        </div>
+
+        <!-- ════════════════ EDIT MODAL ════════════════ -->
+        <div id="edit-modal" class="modal hidden">
+            <div class="modal-backdrop" onclick="App.closeModal()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title">Edit Plugin</h2>
+                    <button class="modal-close" onclick="App.closeModal()">&times;</button>
+                </div>
+                <form id="edit-form" onsubmit="App.savePlugin(event)">
+                    <input type="hidden" id="edit-id">
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit-display_name">Display Name</label>
+                            <input type="text" id="edit-display_name">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-developer">Developer</label>
+                            <input type="text" id="edit-developer">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-plugin_type">Type</label>
+                            <select id="edit-plugin_type">
+                                <option value="">—</option>
+                                <option value="instrument">Instrument</option>
+                                <option value="effect">Effect</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-category">Category</label>
+                            <input type="text" id="edit-category" list="category-list">
+                            <datalist id="category-list"></datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-subcategory">Subcategory</label>
+                            <input type="text" id="edit-subcategory">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-subtype">Subtype</label>
+                            <select id="edit-subtype">
+                                <option value="">—</option>
+                                <option value="original">Original</option>
+                                <option value="emulation">Emulation</option>
+                                <option value="clone">Clone</option>
+                                <option value="utility">Utility</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-emulation_of">Emulation Of</label>
+                            <input type="text" id="edit-emulation_of" placeholder="e.g. Teletronix LA-2A">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-character">Character</label>
+                            <input type="text" id="edit-character" placeholder="e.g. warm, transparent, aggressive">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-signal_chain_position">Signal Chain Position</label>
+                            <select id="edit-signal_chain_position">
+                                <option value="">—</option>
+                                <option value="first">First</option>
+                                <option value="early">Early</option>
+                                <option value="insert">Insert</option>
+                                <option value="late">Late</option>
+                                <option value="last">Last</option>
+                                <option value="bus">Bus</option>
+                                <option value="master">Master</option>
+                                <option value="anywhere">Anywhere</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-tags">Tags</label>
+                            <input type="text" id="edit-tags" placeholder="comma-separated">
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="edit-description">Description</label>
+                        <textarea id="edit-description" rows="2"></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="edit-specialty">Specialty / Hidden Strengths</label>
+                        <textarea id="edit-specialty" rows="2"></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="edit-best_used_for">Best Used For</label>
+                        <textarea id="edit-best_used_for" rows="2"></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="edit-notes">Personal Notes</label>
+                        <textarea id="edit-notes" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-is_own_plugin"> My own plugin
+                        </label>
+                        <div class="form-group" id="own-brand-group">
+                            <label for="edit-own_brand">Brand</label>
+                            <input type="text" id="edit-own_brand" placeholder="e.g. OmegaDSP">
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <span id="edit-meta" class="edit-meta"></span>
+                        <div class="modal-actions">
+                            <button type="button" class="btn" onclick="App.closeModal()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
