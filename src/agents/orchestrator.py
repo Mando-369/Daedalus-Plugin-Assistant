@@ -256,18 +256,18 @@ class EnrichmentOrchestrator:
                         if not old_val or old_val == "":
                             updates[field] = str(new_val).strip()
 
-                if updates:
-                    # Determine confidence based on how many fields got filled
-                    all_key_fields = {"developer", "category", "description", "character"}
-                    filled_keys = sum(1 for f in all_key_fields
-                                      if updates.get(f) or existing.get(f))
-                    if filled_keys >= 3:
-                        updates["classification_confidence"] = "high"
-                        updates["needs_review"] = 0
-                    elif existing.get("classification_confidence") in ("unclassified", "low"):
-                        updates["classification_confidence"] = "medium"
-                        updates["needs_review"] = 0
+                # Always re-evaluate confidence based on total filled state
+                all_key_fields = {"developer", "category", "description", "character"}
+                filled_keys = sum(1 for f in all_key_fields
+                                  if updates.get(f) or existing.get(f))
+                if filled_keys >= 3 and existing.get("classification_confidence") != "high":
+                    updates["classification_confidence"] = "high"
+                    updates["needs_review"] = 0
+                elif existing.get("classification_confidence") in ("unclassified", "low"):
+                    updates["classification_confidence"] = "medium"
+                    updates["needs_review"] = 0
 
+                if updates:
                     set_parts = [f"{k} = ?" for k in updates]
                     set_parts.append("updated_at = datetime('now')")
                     values = list(updates.values()) + [existing["id"]]
