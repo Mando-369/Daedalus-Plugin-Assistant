@@ -254,7 +254,7 @@ def scan_plugins() -> list[dict]:
 
 
 def _cross_reference_metadata(plugins: list[dict]):
-    """Propagate AU metadata (developer, plugin_type) to VST3 with same name."""
+    """Propagate AU metadata (developer, plugin_type, display_name) to VST3."""
     # Build lookup from AU plugins (richest metadata)
     au_metadata = {}
     for p in plugins:
@@ -263,6 +263,7 @@ def _cross_reference_metadata(plugins: list[dict]):
             au_metadata[key] = {
                 "developer": p.get("developer"),
                 "plugin_type": p.get("plugin_type"),
+                "display_name": p.get("display_name"),
             }
 
     # Propagate to non-AU plugins missing metadata
@@ -278,6 +279,9 @@ def _cross_reference_metadata(plugins: list[dict]):
                 propagated += 1
             if not p.get("plugin_type") and au.get("plugin_type"):
                 p["plugin_type"] = au["plugin_type"]
+            # Always prefer AU display name (from plist)
+            if au.get("display_name") and au["display_name"] != p.get("display_name"):
+                p["display_name"] = au["display_name"]
 
     if propagated:
         print(f"  Cross-referenced {propagated} plugins from AU metadata")
