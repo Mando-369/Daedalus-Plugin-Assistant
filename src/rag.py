@@ -10,6 +10,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import json
+
 import httpx
 
 from config import (
@@ -256,41 +258,7 @@ class RAGPipeline:
         full_prompt = f"{context}\n\nUser question: {user_query}"
         messages.append({"role": "user", "content": full_prompt})
 
-        with httpx.Client(timeout=OLLAMA_TIMEOUT) as client:
-            resp = client.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": OLLAMA_TEMPERATURE,
-                        "top_p": OLLAMA_TOP_P,
-                        "num_predict": OLLAMA_NUM_PREDICT,
-                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
-                    },
-                    "keep_alive": OLLAMA_KEEP_ALIVE,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("message", {}).get("content", "No response generated.")
-
-    def generate_stream(self, user_query: str, context: str, chat_history: list = None):
-        """
-        Stream the LLM response token by token.
-        Yields content chunks as they arrive.
-        """
-        messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
-
-        if chat_history:
-            for msg in chat_history[-6:]:
-                messages.append(msg)
-
-        full_prompt = f"{context}\n\nUser question: {user_query}"
-        messages.append({"role": "user", "content": full_prompt})
-
-        with httpx.Client(timeout=OLLAMA_TIMEOUT) as client:
+        with httpx.Client(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
             with client.stream(
                 "POST",
                 f"{OLLAMA_BASE_URL}/api/chat",
@@ -308,8 +276,92 @@ class RAGPipeline:
                 },
             ) as response:
                 response.raise_for_status()
-                import json
+                content_parts = []
                 for line in response.iter_lines():
+                    if line:
+                        chunk = json.loads(line)
+                        content = chunk.get("message", {}).get("content", "")
+                        if content:
+                            content_parts.append(content)
+                        if chunk.get("done"):
+                            break
+                return "".join(content_parts) or "No response generated."
+
+    def generate_stream(self, user_query: str, context: str, chat_history: list = None):
+        """
+        Stream the LLM response token by token.
+        Yields content chunks as they arrive.
+        """
+        messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
+
+        if chat_history:
+            for msg in chat_history[-6:]:
+                messages.append(msg)
+
+        full_prompt = f"{context}\n\nUser question: {user_query}"
+        messages.append({"role": "user", "content": full_prompt})
+
+        with httpx.Client(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
+            with client.stream(
+                "POST",
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": OLLAMA_MODEL,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {
+                        "temperature": OLLAMA_TEMPERATURE,
+                        "top_p": OLLAMA_TOP_P,
+                        "num_predict": OLLAMA_NUM_PREDICT,
+                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
+                    },
+                    "keep_alive": OLLAMA_KEEP_ALIVE,
+                },
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        chunk = json.loads(line)
+                        msg = chunk.get("message", {})
+                        thinking = msg.get("thinking", "")
+                        content = msg.get("content", "")
+                        if thinking:
+                            yield ("thinking", thinking)
+                        if content:
+                            yield ("content", content)
+                        if chunk.get("done"):
+                            break
+
+    async def async_generate_stream(self, user_query: str, context: str, chat_history: list = None):
+        """Async streaming LLM response for use in async WebSocket handlers."""
+        messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
+
+        if chat_history:
+            for msg in chat_history[-6:]:
+                messages.append(msg)
+
+        full_prompt = f"{context}\n\nUser question: {user_query}"
+        messages.append({"role": "user", "content": full_prompt})
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
+            async with client.stream(
+                "POST",
+                f"{OLLAMA_BASE_URL}/api/chat",
+                json={
+                    "model": OLLAMA_MODEL,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {
+                        "temperature": OLLAMA_TEMPERATURE,
+                        "top_p": OLLAMA_TOP_P,
+                        "num_predict": OLLAMA_NUM_PREDICT,
+                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
+                    },
+                    "keep_alive": OLLAMA_KEEP_ALIVE,
+                },
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
                     if line:
                         chunk = json.loads(line)
                         msg = chunk.get("message", {})

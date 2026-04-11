@@ -4,6 +4,8 @@ Deduplicates AU/VST3 pairs and detects own plugins.
 """
 
 import os
+import plistlib
+import re
 import sys
 from pathlib import Path
 
@@ -21,6 +23,94 @@ def clean_plugin_name(filename: str, extension: str) -> str:
         if name.endswith(suffix):
             name = name[: -len(suffix)]
     return name.strip()
+
+
+_AU_TYPE_MAP = {
+    "aufx": "effect",
+    "aumf": "effect",      # music effect (effect with MIDI input)
+    "aumi": "effect",      # MIDI processor
+    "aumu": "instrument",  # music device / instrument
+    "augn": "instrument",  # generator
+}
+
+
+def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
+    """Extract developer + plugin_type from plugin bundle Info.plist.
+
+    Returns dict with 'developer' and 'plugin_type' keys (values may be None).
+    """
+    result = {"developer": None, "plugin_type": None}
+    try:
+        plist_path = os.path.join(bundle_path, "Contents", "Info.plist")
+        if not os.path.isfile(plist_path):
+            return result
+
+        with open(plist_path, "rb") as f:
+            plist = plistlib.load(f)
+
+        # --- Developer extraction ---
+
+        # Priority 1: AudioComponents name (AU only, format "Developer: Plugin Name")
+        if fmt == "AU":
+            audio_components = plist.get("AudioComponents", [])
+            if audio_components and isinstance(audio_components, list):
+                ac = audio_components[0]
+                ac_name = ac.get("name", "")
+                if ": " in ac_name:
+                    developer = ac_name.split(": ", 1)[0].strip()
+                    if len(developer) >= 2:
+                        result["developer"] = developer
+
+                # Extract plugin_type from AU type code
+                au_type = ac.get("type", "")
+                if au_type in _AU_TYPE_MAP:
+                    result["plugin_type"] = _AU_TYPE_MAP[au_type]
+
+        # Priority 2: NSHumanReadableCopyright (skip for AAX - it's PACE wrapper)
+        if not result["developer"] and fmt != "AAX":
+            copyright_str = plist.get("NSHumanReadableCopyright", "")
+            if copyright_str:
+                dev = _clean_copyright(copyright_str)
+                if dev and len(dev) >= 2:
+                    result["developer"] = dev
+
+        # Priority 3: CFBundleIdentifier (com.DeveloperName.PluginName)
+        if not result["developer"] and fmt != "AAX":
+            bundle_id = plist.get("CFBundleIdentifier", "")
+            if bundle_id:
+                parts = bundle_id.split(".")
+                if len(parts) >= 3:
+                    raw = parts[1]
+                    if len(raw) >= 2 and raw.lower() not in (
+                        "vst3", "au", "plugin", "audio", "paceap",
+                    ):
+                        dev = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", raw)
+                        dev = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", dev)
+                        result["developer"] = dev.strip()
+
+        return result
+    except Exception:
+        return result
+
+
+def _clean_copyright(text: str) -> str | None:
+    """Clean a copyright string to extract the developer name."""
+    s = text.strip()
+    # Remove copyright symbols and common prefixes
+    s = re.sub(r"^[\s\u00a9\u00ae\u2122(cC)©®™]+", "", s)
+    s = re.sub(r"^Copyright\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"^\(c\)\s*", "", s, flags=re.IGNORECASE)
+    # Remove year patterns (2010-2025, 2024, etc.)
+    s = re.sub(r"\b\d{4}\s*[-–]\s*\d{4}\b", "", s)
+    s = re.sub(r"\b\d{4}\b", "", s)
+    # Remove trailing boilerplate
+    s = re.sub(r"\.\s*All rights reserved\.?", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"All rights reserved\.?", "", s, flags=re.IGNORECASE)
+    # Clean up whitespace and punctuation
+    s = re.sub(r"\s*[-–—.]+\s*$", "", s)
+    s = re.sub(r"^\s*[-–—.]+\s*", "", s)
+    s = s.strip(" .,;:-–—")
+    return s if s else None
 
 
 def detect_own_plugin(name: str) -> tuple[bool, str | None]:
@@ -87,6 +177,7 @@ def scan_plugins() -> list[dict]:
             seen.add(dedup_key)
 
             is_own, own_brand = detect_own_plugin(name)
+            meta = _extract_metadata_from_plist(full_path, fmt)
 
             plugins.append({
                 "name": name,
@@ -97,18 +188,55 @@ def scan_plugins() -> list[dict]:
                 "file_path": full_path,
                 "is_own_plugin": is_own,
                 "own_brand": own_brand,
+                "developer": meta["developer"],
+                "plugin_type": meta["plugin_type"],
             })
 
-    # Deduplicate across formats: if same plugin exists as AU + VST3, keep both
-    # but link them conceptually (they'll share the same clean name)
-    print(f"\n  Total plugins found: {len(plugins)}")
+    # Cross-format metadata propagation:
+    # AU has the richest metadata (developer + plugin_type).
+    # Propagate to VST3/AAX versions of the same plugin.
+    _cross_reference_metadata(plugins)
 
-    # Count unique names
+    print(f"\n  Total plugins found: {len(plugins)}")
     unique_names = set(p["name"].lower() for p in plugins)
     print(f"  Unique plugin names: {len(unique_names)}")
     print(f"  Own plugins detected: {sum(1 for p in plugins if p['is_own_plugin'])}")
+    fmts = {}
+    for p in plugins:
+        fmts[p["format"]] = fmts.get(p["format"], 0) + 1
+    print(f"  Formats: {fmts}")
 
     return plugins
+
+
+def _cross_reference_metadata(plugins: list[dict]):
+    """Propagate AU metadata (developer, plugin_type) to VST3/AAX with same name."""
+    # Build lookup from AU plugins (richest metadata)
+    au_metadata = {}
+    for p in plugins:
+        if p["format"] == "AU":
+            key = p["name"].lower()
+            au_metadata[key] = {
+                "developer": p.get("developer"),
+                "plugin_type": p.get("plugin_type"),
+            }
+
+    # Propagate to non-AU plugins missing metadata
+    propagated = 0
+    for p in plugins:
+        if p["format"] == "AU":
+            continue
+        key = p["name"].lower()
+        if key in au_metadata:
+            au = au_metadata[key]
+            if not p.get("developer") and au.get("developer"):
+                p["developer"] = au["developer"]
+                propagated += 1
+            if not p.get("plugin_type") and au.get("plugin_type"):
+                p["plugin_type"] = au["plugin_type"]
+
+    if propagated:
+        print(f"  Cross-referenced {propagated} plugins from AU metadata")
 
 
 if __name__ == "__main__":

@@ -61,6 +61,8 @@ def init_db():
         -- Tags for flexible searching
         tags TEXT,                      -- comma-separated tags
         notes TEXT,                     -- personal notes
+        hidden_tips TEXT,               -- non-obvious uses, tricks, forum-sourced tips
+        not_ideal_for TEXT,             -- limitations, what it's bad at
 
         -- Metadata
         classification_confidence TEXT, -- 'high', 'medium', 'low', 'unclassified'
@@ -164,38 +166,52 @@ def init_db():
         ('Glitch', 'Creative', 'Glitch / stutter effects'),
         ('Multi-FX', 'Creative', 'Multi-effect processor');
 
-    -- Full-text search index
-    CREATE VIRTUAL TABLE IF NOT EXISTS plugins_fts USING fts5(
+    -- Full-text search index (drop + recreate to pick up schema changes)
+    DROP TRIGGER IF EXISTS plugins_ai;
+    DROP TRIGGER IF EXISTS plugins_ad;
+    DROP TRIGGER IF EXISTS plugins_au;
+    DROP TABLE IF EXISTS plugins_fts;
+
+    CREATE VIRTUAL TABLE plugins_fts USING fts5(
         name, display_name, developer, category, subcategory,
         description, specialty, best_used_for, character, tags, notes,
+        hidden_tips, not_ideal_for,
         content='plugins',
         content_rowid='id'
     );
 
     -- Triggers to keep FTS in sync
-    CREATE TRIGGER IF NOT EXISTS plugins_ai AFTER INSERT ON plugins BEGIN
+    CREATE TRIGGER plugins_ai AFTER INSERT ON plugins BEGIN
         INSERT INTO plugins_fts(rowid, name, display_name, developer, category, subcategory,
-            description, specialty, best_used_for, character, tags, notes)
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for)
         VALUES (new.id, new.name, new.display_name, new.developer, new.category, new.subcategory,
-            new.description, new.specialty, new.best_used_for, new.character, new.tags, new.notes);
+            new.description, new.specialty, new.best_used_for, new.character, new.tags, new.notes,
+            new.hidden_tips, new.not_ideal_for);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS plugins_ad AFTER DELETE ON plugins BEGIN
+    CREATE TRIGGER plugins_ad AFTER DELETE ON plugins BEGIN
         INSERT INTO plugins_fts(plugins_fts, rowid, name, display_name, developer, category, subcategory,
-            description, specialty, best_used_for, character, tags, notes)
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for)
         VALUES ('delete', old.id, old.name, old.display_name, old.developer, old.category, old.subcategory,
-            old.description, old.specialty, old.best_used_for, old.character, old.tags, old.notes);
+            old.description, old.specialty, old.best_used_for, old.character, old.tags, old.notes,
+            old.hidden_tips, old.not_ideal_for);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS plugins_au AFTER UPDATE ON plugins BEGIN
+    CREATE TRIGGER plugins_au AFTER UPDATE ON plugins BEGIN
         INSERT INTO plugins_fts(plugins_fts, rowid, name, display_name, developer, category, subcategory,
-            description, specialty, best_used_for, character, tags, notes)
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for)
         VALUES ('delete', old.id, old.name, old.display_name, old.developer, old.category, old.subcategory,
-            old.description, old.specialty, old.best_used_for, old.character, old.tags, old.notes);
+            old.description, old.specialty, old.best_used_for, old.character, old.tags, old.notes,
+            old.hidden_tips, old.not_ideal_for);
         INSERT INTO plugins_fts(rowid, name, display_name, developer, category, subcategory,
-            description, specialty, best_used_for, character, tags, notes)
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for)
         VALUES (new.id, new.name, new.display_name, new.developer, new.category, new.subcategory,
-            new.description, new.specialty, new.best_used_for, new.character, new.tags, new.notes);
+            new.description, new.specialty, new.best_used_for, new.character, new.tags, new.notes,
+            new.hidden_tips, new.not_ideal_for);
     END;
 
     -- Indexes
@@ -204,6 +220,28 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_plugins_type ON plugins(plugin_type);
     CREATE INDEX IF NOT EXISTS idx_plugins_is_own ON plugins(is_own_plugin);
     CREATE INDEX IF NOT EXISTS idx_plugins_needs_review ON plugins(needs_review);
+    """)
+
+    # Migrate existing databases: add new columns if missing
+    existing_cols = {
+        row[1] for row in cur.execute("PRAGMA table_info(plugins)").fetchall()
+    }
+    for col, typedef in [
+        ("hidden_tips", "TEXT"),
+        ("not_ideal_for", "TEXT"),
+    ]:
+        if col not in existing_cols:
+            cur.execute(f"ALTER TABLE plugins ADD COLUMN {col} {typedef}")
+
+    # Rebuild FTS index from existing data
+    cur.execute("""
+        INSERT INTO plugins_fts(rowid, name, display_name, developer, category, subcategory,
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for)
+        SELECT id, name, display_name, developer, category, subcategory,
+            description, specialty, best_used_for, character, tags, notes,
+            hidden_tips, not_ideal_for
+        FROM plugins
     """)
 
     conn.commit()

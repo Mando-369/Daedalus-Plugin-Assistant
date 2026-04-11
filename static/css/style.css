@@ -685,6 +685,45 @@ body {
 }
 .modal-close:hover { color: var(--text-primary); }
 
+.modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--gap-sm);
+}
+
+.btn-sm {
+    padding: 4px 12px;
+    font-size: var(--font-size-sm);
+}
+
+.enrich-context-section {
+    margin-bottom: var(--gap);
+    padding: var(--gap-sm);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+}
+
+.enrich-context-section summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.enrich-status {
+    padding: var(--gap-sm) var(--gap);
+    margin-bottom: var(--gap-sm);
+    font-size: var(--font-size-sm);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb, 100, 149, 237), 0.1);
+    border-radius: var(--radius);
+}
+
+.enriched-field {
+    outline: 2px solid var(--accent);
+    transition: outline 0.3s ease;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

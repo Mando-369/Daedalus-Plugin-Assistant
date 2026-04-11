@@ -106,6 +106,18 @@ PLUGIN_SCAN_DIRS = [
         "scope": "user",
         "extension": ".vst3",
     },
+    {
+        "path": "/Library/Application Support/Avid/Audio/Plug-Ins",
+        "format": "AAX",
+        "scope": "system",
+        "extension": ".aaxplugin",
+    },
+    {
+        "path": os.path.expanduser("~/Library/Application Support/Avid/Audio/Plug-Ins"),
+        "format": "AAX",
+        "scope": "user",
+        "extension": ".aaxplugin",
+    },
 ]
 
 # ──────────────────────────────────────────────
@@ -121,7 +133,7 @@ WEB_LOG_LEVEL = "info"
 # Ollama / LLM
 # ──────────────────────────────────────────────
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
-OLLAMA_MODEL = "qwen3.5:9b-nvfp4"  # adjust to your pulled model name
+OLLAMA_MODEL = "gemma4:26b"  # adjust to your pulled model name
 OLLAMA_TIMEOUT = 120           # seconds to wait for LLM response
 OLLAMA_TEMPERATURE = 0.3       # lower = more factual, higher = more creative
 OLLAMA_TOP_P = 0.9

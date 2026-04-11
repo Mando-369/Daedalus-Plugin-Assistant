@@ -508,12 +508,18 @@ const App = (() => {
                 'display_name', 'developer', 'plugin_type', 'category',
                 'subcategory', 'subtype', 'emulation_of', 'character',
                 'signal_chain_position', 'tags', 'description',
-                'specialty', 'best_used_for', 'notes', 'own_brand',
+                'specialty', 'best_used_for', 'hidden_tips', 'not_ideal_for',
+                'notes', 'own_brand',
             ];
             fields.forEach(f => {
                 const el = document.getElementById(`edit-${f}`);
                 if (el) el.value = p[f] || '';
             });
+
+            // Clear enrich context inputs
+            document.getElementById('enrich-url').value = '';
+            document.getElementById('enrich-pdf').value = '';
+            document.getElementById('enrich-single-status').classList.add('hidden');
 
             document.getElementById('edit-is_own_plugin').checked = !!p.is_own_plugin;
 
@@ -543,7 +549,8 @@ const App = (() => {
             'display_name', 'developer', 'plugin_type', 'category',
             'subcategory', 'subtype', 'emulation_of', 'character',
             'signal_chain_position', 'tags', 'description',
-            'specialty', 'best_used_for', 'notes', 'own_brand',
+            'specialty', 'best_used_for', 'hidden_tips', 'not_ideal_for',
+            'notes', 'own_brand',
         ];
 
         const body = {};
@@ -576,6 +583,62 @@ const App = (() => {
         }
     }
 
+    // ── Per-Plugin Enrichment ───────────────────
+    async function enrichSingle() {
+        const id = document.getElementById('edit-id').value;
+        if (!id) return;
+
+        const url = document.getElementById('enrich-url').value.trim() || undefined;
+        const pdfPath = document.getElementById('enrich-pdf').value.trim() || undefined;
+
+        const btn = document.getElementById('btn-enrich-single');
+        const statusEl = document.getElementById('enrich-single-status');
+
+        btn.disabled = true;
+        btn.textContent = 'Enriching...';
+        statusEl.textContent = 'Running research agents...';
+        statusEl.classList.remove('hidden');
+
+        try {
+            const body = {};
+            if (url) body.url = url;
+            if (pdfPath) body.pdf_path = pdfPath;
+
+            const resp = await fetch(`/api/plugins/${id}/enrich`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+
+            if (data.plugin) {
+                // Auto-fill empty form fields with enriched data
+                const enrichFields = [
+                    'developer', 'plugin_type', 'category', 'subcategory',
+                    'subtype', 'emulation_of', 'character', 'signal_chain_position',
+                    'tags', 'description', 'specialty', 'best_used_for',
+                    'hidden_tips', 'not_ideal_for',
+                ];
+                enrichFields.forEach(f => {
+                    const el = document.getElementById(`edit-${f}`);
+                    if (el && !el.value && data.plugin[f]) {
+                        el.value = data.plugin[f];
+                        el.classList.add('enriched-field');
+                        setTimeout(() => el.classList.remove('enriched-field'), 3000);
+                    }
+                });
+                statusEl.textContent = 'Enrichment complete. Review and save.';
+            } else {
+                statusEl.textContent = data.detail || 'Enrichment returned no data.';
+            }
+        } catch (e) {
+            statusEl.textContent = `Error: ${e.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Enrich';
+        }
+    }
+
     // ── Scan ────────────────────────────────────
     async function triggerScan() {
         const btn = document.getElementById('btn-scan');
@@ -587,8 +650,11 @@ const App = (() => {
         try {
             const resp = await fetch('/api/scan', { method: 'POST' });
             const data = await resp.json();
-            status.textContent =
-                `Scan complete: ${data.scanned} scanned, ${data.inserted} new, ${data.updated} updated, ${data.embedded} embedded`;
+            let statusText = `Scan complete: ${data.scanned} scanned, ${data.inserted} new, ${data.updated} updated, ${data.embedded} embedded`;
+            if (data.new_plugin_ids && data.new_plugin_ids.length > 0) {
+                statusText += ` | ${data.new_plugin_ids.length} new plugins ready for enrichment`;
+            }
+            status.textContent = statusText;
 
             // Refresh all views
             loadFilters();
@@ -687,6 +753,7 @@ const App = (() => {
         savePlugin,
         triggerScan,
         startEnrichment,
+        enrichSingle,
         _paginate,
     };
 })();

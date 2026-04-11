@@ -110,8 +110,26 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 id="modal-title">Edit Plugin</h2>
-                    <button class="modal-close" onclick="App.closeModal()">&times;</button>
+                    <div class="modal-header-actions">
+                        <button type="button" class="btn btn-sm btn-accent" id="btn-enrich-single"
+                                onclick="App.enrichSingle()">Enrich</button>
+                        <button class="modal-close" onclick="App.closeModal()">&times;</button>
+                    </div>
                 </div>
+                <div id="enrich-single-status" class="enrich-status hidden"></div>
+                <details class="enrich-context-section" id="enrich-context">
+                    <summary>Provide additional context (optional)</summary>
+                    <div class="form-grid" style="margin-top: 8px;">
+                        <div class="form-group">
+                            <label for="enrich-url">URL (product page, review, etc.)</label>
+                            <input type="url" id="enrich-url" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label for="enrich-pdf">PDF manual path</label>
+                            <input type="text" id="enrich-pdf" placeholder="/path/to/manual.pdf">
+                        </div>
+                    </div>
+                </details>
                 <form id="edit-form" onsubmit="App.savePlugin(event)">
                     <input type="hidden" id="edit-id">
 
@@ -192,6 +210,14 @@
                     <div class="form-group full-width">
                         <label for="edit-best_used_for">Best Used For</label>
                         <textarea id="edit-best_used_for" rows="2"></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="edit-hidden_tips">Hidden Tips</label>
+                        <textarea id="edit-hidden_tips" rows="2" placeholder="Non-obvious tricks, pro tips"></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="edit-not_ideal_for">Not Ideal For</label>
+                        <textarea id="edit-not_ideal_for" rows="2" placeholder="Limitations, weaknesses"></textarea>
                     </div>
                     <div class="form-group full-width">
                         <label for="edit-notes">Personal Notes</label>

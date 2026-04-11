@@ -3,6 +3,7 @@ Daedalus Plugin Assistant - FastAPI Web Application
 REST API + WebSocket chat + CRUD for plugin management.
 """
 
+import asyncio
 import json
 import sys
 import traceback
@@ -70,6 +71,8 @@ class PluginUpdate(BaseModel):
     signal_chain_position: Optional[str] = None
     tags: Optional[str] = None
     notes: Optional[str] = None
+    hidden_tips: Optional[str] = None
+    not_ideal_for: Optional[str] = None
     is_own_plugin: Optional[bool] = None
     own_brand: Optional[str] = None
     needs_review: Optional[bool] = None
@@ -407,7 +410,7 @@ async def websocket_chat(websocket: WebSocket):
                     "content": "Searching plugin database..."
                 })
 
-                plugins = rag.hybrid_search(user_query)
+                plugins = await asyncio.to_thread(rag.hybrid_search, user_query)
                 context = rag.build_context(plugins)
 
                 sources = [
@@ -424,13 +427,13 @@ async def websocket_chat(websocket: WebSocket):
                     "content": sources,
                 })
 
-                # Generation phase - stream tokens
+                # Generation phase - stream tokens (async, non-blocking)
                 await websocket.send_json({
                     "type": "status",
                     "content": "Generating response..."
                 })
 
-                for token_type, token_text in rag.generate_stream(user_query, context, history):
+                async for token_type, token_text in rag.async_generate_stream(user_query, context, history):
                     await websocket.send_json({
                         "type": token_type,  # "thinking" or "content"
                         "content": token_text,
@@ -465,6 +468,7 @@ async def trigger_scan():
         conn = get_db()
         inserted = 0
         updated = 0
+        new_plugin_ids = []
         try:
             for p in classified:
                 existing = conn.execute(
@@ -473,22 +477,39 @@ async def trigger_scan():
                 ).fetchone()
 
                 if existing:
-                    # Update existing entry (don't overwrite manual edits for classified fields)
-                    conn.execute("""
-                        UPDATE plugins SET
-                            name = ?, display_name = ?, file_path = ?,
-                            is_own_plugin = ?, own_brand = ?,
-                            updated_at = datetime('now')
-                        WHERE id = ?
-                    """, (
+                    # Update existing entry (don't overwrite manual edits)
+                    # Fill developer and plugin_type if currently empty
+                    existing_row = conn.execute(
+                        "SELECT developer, plugin_type FROM plugins WHERE id = ?",
+                        (existing["id"],),
+                    ).fetchone()
+
+                    extra_sets = []
+                    extra_vals = []
+                    if p.get("developer") and not existing_row["developer"]:
+                        extra_sets.append("developer = ?")
+                        extra_vals.append(p["developer"])
+                    if p.get("plugin_type") and not existing_row["plugin_type"]:
+                        extra_sets.append("plugin_type = ?")
+                        extra_vals.append(p["plugin_type"])
+
+                    set_clause = "name = ?, display_name = ?, file_path = ?, is_own_plugin = ?, own_brand = ?"
+                    base_vals = [
                         p["name"], p["display_name"], p["file_path"],
                         1 if p.get("is_own_plugin") else 0,
                         p.get("own_brand"),
-                        existing["id"],
-                    ))
+                    ]
+                    if extra_sets:
+                        set_clause += ", " + ", ".join(extra_sets)
+                        base_vals.extend(extra_vals)
+
+                    conn.execute(
+                        f"UPDATE plugins SET {set_clause}, updated_at = datetime('now') WHERE id = ?",
+                        base_vals + [existing["id"]],
+                    )
                     updated += 1
                 else:
-                    conn.execute("""
+                    cursor = conn.execute("""
                         INSERT INTO plugins (
                             name, display_name, developer, is_own_plugin, own_brand,
                             format, file_name, install_scope, file_path,
@@ -510,6 +531,7 @@ async def trigger_scan():
                         p.get("classification_confidence", "unclassified"),
                         1 if p.get("needs_review") else 0,
                     ))
+                    new_plugin_ids.append(cursor.lastrowid)
                     inserted += 1
 
             conn.commit()
@@ -533,6 +555,7 @@ async def trigger_scan():
             "inserted": inserted,
             "updated": updated,
             "embedded": embedded,
+            "new_plugin_ids": new_plugin_ids,
         }
 
     except Exception as e:
@@ -544,53 +567,34 @@ async def trigger_scan():
 
 @app.websocket("/ws/enrich")
 async def websocket_enrich(websocket: WebSocket):
-    """WebSocket endpoint for streaming enrichment progress."""
+    """WebSocket endpoint for streaming enrichment progress using autonomous agents."""
     await websocket.accept()
 
     try:
         data = await websocket.receive_text()
         msg = json.loads(data)
         limit = msg.get("limit")
+        plugin_ids = msg.get("plugin_ids")
 
-        from src.enrichment import PluginEnrichmentService
-        service = PluginEnrichmentService()
+        from src.agents.orchestrator import EnrichmentOrchestrator
+        orchestrator = EnrichmentOrchestrator()
 
-        for progress in service.enrich_all(limit=limit):
+        def _run_batch():
+            return list(orchestrator.enrich_batch(
+                plugin_ids=plugin_ids, limit=limit,
+            ))
+
+        results = await asyncio.to_thread(_run_batch)
+
+        for progress in results:
             await websocket.send_json(progress)
-
-        # Re-embed all plugins after enrichment
-        await websocket.send_json({
-            "processed": progress["total"],
-            "total": progress["total"],
-            "current": "Re-embedding plugins...",
-            "stats": progress["stats"],
-            "done": False,
-        })
-
-        conn = get_db()
-        try:
-            all_plugins = [dict(r) for r in conn.execute("SELECT * FROM plugins").fetchall()]
-        finally:
-            conn.close()
-
-        store = get_embeddings()
-        store.delete_all()
-        store.upsert_plugins(all_plugins)
-
-        await websocket.send_json({
-            "processed": progress["total"],
-            "total": progress["total"],
-            "current": "",
-            "stats": progress["stats"],
-            "done": True,
-        })
 
     except WebSocketDisconnect:
         pass
     except Exception as e:
         traceback.print_exc()
         try:
-            await websocket.send_json({"error": str(e), "done": True})
+            await websocket.send_json({"type": "error", "error": str(e)})
         except Exception:
             pass
 
@@ -610,6 +614,68 @@ async def enrichment_status():
         return {"needs_enrichment": needs}
     finally:
         conn.close()
+
+
+class EnrichRequest(BaseModel):
+    url: Optional[str] = None
+    pdf_path: Optional[str] = None
+
+
+@app.post("/api/plugins/{plugin_id}/enrich")
+async def enrich_plugin(plugin_id: int, request: EnrichRequest = EnrichRequest()):
+    """Enrich a single plugin using autonomous research agents."""
+    try:
+        # Validate plugin exists
+        conn = get_db()
+        try:
+            plugin = conn.execute(
+                "SELECT id, name FROM plugins WHERE id = ?", (plugin_id,)
+            ).fetchone()
+            if not plugin:
+                raise HTTPException(status_code=404, detail="Plugin not found")
+        finally:
+            conn.close()
+
+        from src.agents.orchestrator import EnrichmentOrchestrator
+        orchestrator = EnrichmentOrchestrator()
+        result = await asyncio.to_thread(
+            orchestrator.enrich_single,
+            plugin_id,
+            url=request.url,
+            pdf_path=request.pdf_path,
+        )
+
+        # Re-embed affected plugins
+        conn = get_db()
+        try:
+            affected = [
+                dict(r) for r in conn.execute(
+                    "SELECT * FROM plugins WHERE LOWER(name) = ?",
+                    (plugin["name"].lower(),),
+                ).fetchall()
+            ]
+        finally:
+            conn.close()
+
+        store = get_embeddings()
+        store.upsert_plugins(affected)
+
+        # Return enrichment result + updated plugin data
+        conn = get_db()
+        try:
+            updated = dict(conn.execute(
+                "SELECT * FROM plugins WHERE id = ?", (plugin_id,)
+            ).fetchone())
+        finally:
+            conn.close()
+
+        return {"enrichment": result, "plugin": updated}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Startup ────────────────────────────────────────
