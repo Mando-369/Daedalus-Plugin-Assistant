@@ -194,7 +194,7 @@ SQL_SEARCH_LIMIT = 20          # how many results from structured SQL search
 # ──────────────────────────────────────────────
 # RAG Pipeline
 # ──────────────────────────────────────────────
-RAG_MAX_CONTEXT_PLUGINS = 12   # max plugins to include in LLM context
+RAG_MAX_CONTEXT_PLUGINS = 20   # max plugins to include in LLM context
 RAG_CONTEXT_TEMPLATE = """Here are relevant plugins from the user's collection:
 
 {plugin_context}

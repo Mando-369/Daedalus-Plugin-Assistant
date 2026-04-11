@@ -40,11 +40,24 @@ class RAGPipeline:
         """
         conn = get_db()
         try:
-            # Build FTS query - escape special chars
+            # Build FTS query - escape special chars, filter stop words
             fts_query = query.replace('"', '""')
-            terms = fts_query.split()
+            stop_words = {
+                "a", "an", "the", "is", "are", "was", "were", "be", "been",
+                "do", "does", "did", "have", "has", "had", "i", "me", "my",
+                "we", "our", "you", "your", "it", "its", "they", "them",
+                "which", "what", "who", "how", "when", "where", "why",
+                "can", "could", "would", "should", "will", "shall",
+                "of", "in", "on", "at", "to", "for", "with", "from", "by",
+                "and", "or", "not", "no", "but", "if", "so", "that", "this",
+                "all", "any", "some", "many", "much", "most", "very",
+                "just", "also", "about", "like", "need", "want", "find",
+                "show", "list", "get", "give", "tell", "something",
+            }
+            terms = [t for t in fts_query.split()
+                     if t.strip() and t.lower() not in stop_words and len(t) > 1]
             # Use prefix matching for each term
-            fts_terms = " OR ".join(f'"{t}"*' for t in terms if t.strip())
+            fts_terms = " OR ".join(f'"{t}"*' for t in terms)
 
             if not fts_terms:
                 return []
