@@ -2,31 +2,66 @@
 Agent Tools - Functions that LLM agents can call via tool-calling.
 
 Each tool has a Python implementation and an Ollama schema definition.
+Search uses SearXNG (self-hosted) as primary, DuckDuckGo as fallback.
 """
 
 import re
+import sys
 import time
+from pathlib import Path
 from urllib.parse import unquote
 
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import httpx
+
+from config import SEARXNG_URL
 
 
 # ── Rate limiting ────────────────────────────────
 
 _last_search_time = 0.0
-_SEARCH_DELAY = 4.0  # seconds between DuckDuckGo requests (avoid rate limiting)
+_SEARCH_DELAY = 1.0  # SearXNG is local, minimal delay needed
+_DDG_DELAY = 4.0     # DuckDuckGo needs more breathing room
 
 
-# ── Tool Implementations ────────────────────────
+# ── Search Backends ─────────────────────────────
 
-def web_search(query: str, num_results: int = 5) -> list[dict]:
-    """Search the web using DuckDuckGo. Returns [{title, url, snippet}]."""
+def _searxng_search(query: str, num_results: int = 5) -> list[dict]:
+    """Search using local SearXNG instance (JSON API)."""
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.get(
+                f"{SEARXNG_URL}/search",
+                params={
+                    "q": query,
+                    "format": "json",
+                    "categories": "general",
+                    "engines": "google,bing,duckduckgo,brave",
+                    "language": "en",
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                results = []
+                for r in data.get("results", [])[:num_results]:
+                    results.append({
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "snippet": r.get("content", ""),
+                    })
+                return results
+    except Exception:
+        pass
+    return []
+
+
+def _ddg_search(query: str, num_results: int = 5) -> list[dict]:
+    """Fallback: Search using DuckDuckGo HTML scraping."""
     global _last_search_time
-
-    # Rate limiting
     elapsed = time.time() - _last_search_time
-    if elapsed < _SEARCH_DELAY:
-        time.sleep(_SEARCH_DELAY - elapsed)
+    if elapsed < _DDG_DELAY:
+        time.sleep(_DDG_DELAY - elapsed)
     _last_search_time = time.time()
 
     results = []
@@ -58,9 +93,30 @@ def web_search(query: str, num_results: int = 5) -> list[dict]:
                         if m:
                             url = unquote(m.group(1))
                     results.append({"title": title, "url": url, "snippet": snippet})
-    except Exception as e:
-        return [{"error": str(e)}]
+    except Exception:
+        pass
+    return results
 
+
+# ── Tool Implementations ────────────────────────
+
+def web_search(query: str, num_results: int = 5) -> list[dict]:
+    """Search the web. Uses SearXNG (local) with DuckDuckGo fallback."""
+    global _last_search_time
+
+    # Minimal delay for SearXNG (local instance)
+    elapsed = time.time() - _last_search_time
+    if elapsed < _SEARCH_DELAY:
+        time.sleep(_SEARCH_DELAY - elapsed)
+    _last_search_time = time.time()
+
+    # Try SearXNG first (local, no rate limits)
+    results = _searxng_search(query, num_results)
+    if results:
+        return results
+
+    # Fallback to DuckDuckGo
+    results = _ddg_search(query, num_results)
     return results if results else [{"info": "No results found"}]
 
 

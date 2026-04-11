@@ -32,12 +32,19 @@ cd plugin-manager-assistant
 # 2. Start Ollama
 ollama serve
 
-# 3. Run the app (auto-creates venv, pulls model if needed)
+# 3. Start SearXNG (local search engine -- recommended)
+docker run -d --name searxng -p 8888:8080 \
+  -e SEARXNG_SECRET=$(openssl rand -hex 32) \
+  searxng/searxng
+
+# 4. Run the app (auto-creates venv, pulls model if needed)
 ./run.sh
 
-# 4. Open in browser
+# 5. Open in browser
 open http://127.0.0.1:8777
 ```
+
+> **SearXNG is optional but recommended.** It aggregates results from Google, Bing, Brave, and DuckDuckGo without rate limits. Without it, the app falls back to DuckDuckGo which rate-limits after heavy use.
 
 Or manually:
 

@@ -130,6 +130,16 @@ WEB_WORKERS = 1    # single worker is fine for local use
 WEB_LOG_LEVEL = "info"
 
 # ──────────────────────────────────────────────
+# Search (SearXNG)
+# ──────────────────────────────────────────────
+SEARXNG_URL = "http://127.0.0.1:8888"  # local SearXNG instance
+# To set up SearXNG:
+#   docker run -d --name searxng -p 8888:8080 \
+#     -e SEARXNG_SECRET=$(openssl rand -hex 32) \
+#     searxng/searxng
+# Falls back to DuckDuckGo if SearXNG is not running.
+
+# ──────────────────────────────────────────────
 # Ollama / LLM
 # ──────────────────────────────────────────────
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
