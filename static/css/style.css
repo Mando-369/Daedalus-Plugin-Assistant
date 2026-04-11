@@ -688,7 +688,7 @@ body {
 .modal-header-actions {
     display: flex;
     align-items: center;
-    gap: var(--gap-sm);
+    gap: var(--gap);
 }
 
 .btn-sm {
