@@ -215,4 +215,4 @@ run.sh                One-command startup (Python, Ollama, SearXNG, server)
 
 ## License
 
-MIT
+GPL v3 -- see [LICENSE](LICENSE)
