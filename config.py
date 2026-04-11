@@ -158,11 +158,12 @@ OLLAMA_NUM_PREDICT = (
     else int(OLLAMA_NUM_PREDICT_SETTING)
 )
 
-# Log what was detected (visible in run.sh output)
+# Log what was detected (only when running the app, not one-liner imports)
 import sys as _sys
-_mode = 'auto' if OLLAMA_CONTEXT_LENGTH_SETTING == 'auto' else 'manual'
-print(f"  System: {_system_ram}GB RAM | Model max context: {_model_max_ctx or 'unknown'}", file=_sys.stderr)
-print(f"  Token limits: context={OLLAMA_CONTEXT_LENGTH}, predict={OLLAMA_NUM_PREDICT} ({_mode})", file=_sys.stderr)
+if not getattr(_sys, '_called_from_test', False) and len(_sys.argv) > 1:
+    _mode = 'auto' if OLLAMA_CONTEXT_LENGTH_SETTING == 'auto' else 'manual'
+    print(f"  System: {_system_ram}GB RAM | Model max context: {_model_max_ctx or 'unknown'}", file=_sys.stderr)
+    print(f"  Token limits: context={OLLAMA_CONTEXT_LENGTH}, predict={OLLAMA_NUM_PREDICT} ({_mode})", file=_sys.stderr)
 
 # System prompt for the assistant
 LLM_SYSTEM_PROMPT = """You are Daedalus, a knowledgeable audio plugin assistant. You help the user manage,
