@@ -251,6 +251,19 @@ async def update_plugin(plugin_id: int, update: PluginUpdate):
         values = list(fields.values()) + [plugin_id]
 
         conn.execute(f"UPDATE plugins SET {set_clause} WHERE id = ?", values)
+
+        # Re-evaluate confidence based on filled key fields
+        row = conn.execute("SELECT * FROM plugins WHERE id = ?", (plugin_id,)).fetchone()
+        if row:
+            p = dict(row)
+            key_fields = ("developer", "category", "description", "character")
+            filled = sum(1 for f in key_fields if p.get(f))
+            if filled >= 3 and p.get("classification_confidence") != "high":
+                conn.execute(
+                    "UPDATE plugins SET classification_confidence = 'high', needs_review = 0 WHERE id = ?",
+                    (plugin_id,),
+                )
+
         conn.commit()
 
         # Re-embed this plugin
