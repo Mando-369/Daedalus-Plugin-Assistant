@@ -25,6 +25,61 @@ def clean_plugin_name(filename: str, extension: str) -> str:
     return name.strip()
 
 
+def _make_display_name(raw_name: str) -> str:
+    """Convert a raw plugin name into a human-readable display name.
+
+    Examples:
+        uaudio_manley_voxbox    → Manley VoxBox
+        uaudio_teletronix_la-2a → Teletronix LA-2A
+        uaudio_api_2500         → API 2500
+        BlackRoosterAudio VLA-2A Mark II → VLA-2A Mark II
+    """
+    name = raw_name
+
+    # Strip known vendor prefixes from filenames
+    vendor_prefixes = [
+        "uaudio_",         # Universal Audio
+        "BlackRoosterAudio ", "BlackRoosterAudio_",
+        "Harrison_",
+        "iZ",              # iZotope hooks (iZVocalSynth2AUHook etc.)
+    ]
+    for prefix in vendor_prefixes:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+
+    # Replace underscores with spaces
+    name = name.replace("_", " ")
+
+    # Capitalize each word, but preserve acronyms and model numbers
+    words = name.split()
+    result = []
+    for w in words:
+        # Already has uppercase letters (acronym/model) → keep as-is
+        if any(c.isupper() for c in w) and len(w) > 1:
+            result.append(w)
+        # All lowercase → title case
+        elif w.islower():
+            result.append(w.capitalize())
+        else:
+            result.append(w)
+    name = " ".join(result)
+
+    # Fix common patterns: uppercase known acronyms
+    for acronym in ["LA-2A", "LA-3A", "API", "SSL", "EQ", "VCA", "FET",
+                     "ATR", "VT", "HP", "LP", "DSP", "VST", "AU"]:
+        name = re.sub(rf'\b{re.escape(acronym)}\b', acronym, name, flags=re.IGNORECASE)
+
+    # Fix known model name variants (no hyphens in filename)
+    name = re.sub(r'\bla2a\b', 'LA-2A', name, flags=re.IGNORECASE)
+    name = re.sub(r'\bla3a\b', 'LA-3A', name, flags=re.IGNORECASE)
+    name = re.sub(r'\bVoxbox\b', 'VoxBox', name)
+    name = re.sub(r'\bMk\b', 'MK', name)
+    name = re.sub(r'\bMkII\b', 'MKII', name)
+
+    return name.strip()
+
+
 _AU_TYPE_MAP = {
     "aufx": "effect",
     "aumf": "effect",      # music effect (effect with MIDI input)
@@ -179,9 +234,11 @@ def scan_plugins() -> list[dict]:
             is_own, own_brand = detect_own_plugin(name)
             meta = _extract_metadata_from_plist(full_path, fmt)
 
+            display_name = _make_display_name(name)
+
             plugins.append({
                 "name": name,
-                "display_name": name,
+                "display_name": display_name,
                 "file_name": entry,
                 "format": fmt,
                 "install_scope": scope,
