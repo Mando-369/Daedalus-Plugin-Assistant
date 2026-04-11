@@ -65,7 +65,13 @@ def web_search(query: str, num_results: int = 5) -> list[dict]:
 
 
 def fetch_page(url: str) -> str:
-    """Fetch a web page and return its main text content."""
+    """Fetch a web page and return its main text content.
+
+    Extracts content in priority order:
+    1. JSON-LD structured data (works on JS-rendered sites like Gumroad)
+    2. Meta descriptions (og:description, description)
+    3. Body text (stripped HTML)
+    """
     skip_patterns = (".pdf", ".zip", ".dmg", ".exe", ".wav", ".mp3")
     if any(url.lower().endswith(ext) for ext in skip_patterns):
         return f"Skipped binary file: {url}"
@@ -77,7 +83,8 @@ def fetch_page(url: str) -> str:
                 headers={
                     "User-Agent": (
                         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36"
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0.0.0 Safari/537.36"
                     ),
                 },
             )
@@ -85,27 +92,54 @@ def fetch_page(url: str) -> str:
                 return f"HTTP {resp.status_code}"
 
             html = resp.text
+            parts = []
 
-            # Remove script, style, nav, header, footer elements
-            html = re.sub(r"<(script|style|nav|header|footer)[^>]*>.*?</\1>", "", html, flags=re.DOTALL | re.IGNORECASE)
+            # 1. Extract JSON-LD structured data (survives JS rendering)
+            ld_blocks = re.findall(
+                r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+                html, re.DOTALL | re.IGNORECASE,
+            )
+            for block in ld_blocks:
+                block = block.strip()
+                if block:
+                    parts.append(f"[Structured Data] {block[:2000]}")
+
+            # 2. Extract meta descriptions
+            for attr in ("og:description", "description", "twitter:description"):
+                meta = re.findall(
+                    rf'<meta[^>]*(?:name|property)="{attr}"[^>]*content="([^"]+)"',
+                    html, re.IGNORECASE,
+                )
+                if not meta:
+                    meta = re.findall(
+                        rf"<meta[^>]*content=\"([^\"]+)\"[^>]*(?:name|property)=\"{attr}\"",
+                        html, re.IGNORECASE,
+                    )
+                for m in meta[:1]:
+                    parts.append(f"[Meta Description] {m}")
+
+            # 3. Extract body text (strip HTML)
+            body = html
+            # Remove script, style, nav, footer
+            body = re.sub(r"<(script|style|nav|footer)[^>]*>.*?</\1>", "", body, flags=re.DOTALL | re.IGNORECASE)
             # Remove HTML tags
-            text = re.sub(r"<[^>]+>", " ", html)
-            # Collapse whitespace
-            text = re.sub(r"\s+", " ", text).strip()
-            # Decode HTML entities
-            text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-            text = text.replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " ")
+            body_text = re.sub(r"<[^>]+>", " ", body)
+            body_text = re.sub(r"\s+", " ", body_text).strip()
+            # Decode entities
+            for old, new in [("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"),
+                             ("&quot;", '"'), ("&#39;", "'"), ("&nbsp;", " ")]:
+                body_text = body_text.replace(old, new)
 
-            # Smart truncation: keep paragraphs intact, don't cut mid-sentence
-            if len(text) > 5000:
-                # Find the last sentence boundary before 5000 chars
-                cut = text[:5000].rfind(". ")
-                if cut > 3000:
-                    text = text[:cut + 1]
-                else:
-                    text = text[:5000]
+            if len(body_text) > 100:
+                # Smart truncation
+                limit = 4000 - sum(len(p) for p in parts)
+                if limit > 500:
+                    cut = body_text[:limit].rfind(". ")
+                    body_text = body_text[:cut + 1] if cut > limit // 2 else body_text[:limit]
+                    parts.append(f"[Page Content] {body_text}")
 
-            return text if text else "Page had no readable content"
+            result = "\n\n".join(parts)
+            return result if result else "Page had no readable content"
 
     except Exception as e:
         return f"Error fetching page: {e}"
