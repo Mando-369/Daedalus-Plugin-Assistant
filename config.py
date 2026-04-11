@@ -4,7 +4,71 @@ All adjustable parameters live here. Nothing hardcoded elsewhere.
 """
 
 import os
+import platform
+import subprocess
+import logging
 from pathlib import Path
+
+
+# ──────────────────────────────────────────────
+# System Auto-Detection
+# ──────────────────────────────────────────────
+
+def _detect_system_ram_gb() -> int:
+    """Detect total system RAM in GB."""
+    try:
+        if platform.system() == "Darwin":
+            raw = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True).strip()
+            return int(raw) // (1024 ** 3)
+        elif platform.system() == "Linux":
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal"):
+                        kb = int(line.split()[1])
+                        return kb // (1024 ** 2)
+    except Exception:
+        pass
+    return 16  # safe fallback
+
+
+def _detect_ollama_model_context(base_url: str, model: str) -> int | None:
+    """Query Ollama for the model's max supported context length."""
+    try:
+        import httpx
+        resp = httpx.post(f"{base_url}/api/show", json={"name": model}, timeout=10)
+        if resp.status_code == 200:
+            info = resp.json().get("model_info", {})
+            for key, val in info.items():
+                if "context_length" in key:
+                    return int(val)
+    except Exception:
+        pass
+    return None
+
+
+def _auto_token_limits(ram_gb: int, model_max_ctx: int | None) -> tuple[int, int]:
+    """
+    Determine optimal context_length and num_predict based on system RAM
+    and model capabilities. Returns (context_length, num_predict).
+
+    Conservative tiers — leaves plenty of room for OS and other processes.
+    """
+    if ram_gb >= 96:
+        ctx, predict = 32768, 16384
+    elif ram_gb >= 64:
+        ctx, predict = 24576, 12288
+    elif ram_gb >= 32:
+        ctx, predict = 16384, 8192
+    elif ram_gb >= 16:
+        ctx, predict = 8192, 4096
+    else:
+        ctx, predict = 4096, 2048
+
+    # Cap to model's actual max if known
+    if model_max_ctx:
+        ctx = min(ctx, model_max_ctx)
+
+    return ctx, predict
 
 # ──────────────────────────────────────────────
 # Paths
@@ -59,11 +123,33 @@ WEB_LOG_LEVEL = "info"
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 OLLAMA_MODEL = "qwen3.5:9b-nvfp4"  # adjust to your pulled model name
 OLLAMA_TIMEOUT = 120           # seconds to wait for LLM response
-OLLAMA_CONTEXT_LENGTH = 8192   # max context window tokens
 OLLAMA_TEMPERATURE = 0.3       # lower = more factual, higher = more creative
 OLLAMA_TOP_P = 0.9
-OLLAMA_NUM_PREDICT = 8192      # max tokens in response (qwen3.5 uses internal reasoning that consumes tokens)
 OLLAMA_KEEP_ALIVE = "10m"      # keep model loaded in memory
+
+# Token limits — set to "auto" to detect from system specs, or override with int
+# Auto-detection checks RAM + model's max context and picks optimal values
+OLLAMA_CONTEXT_LENGTH_SETTING = "auto"   # "auto" or int (e.g. 32768)
+OLLAMA_NUM_PREDICT_SETTING = "auto"      # "auto" or int (e.g. 16384)
+
+# Resolve auto settings
+_system_ram = _detect_system_ram_gb()
+_model_max_ctx = _detect_ollama_model_context(OLLAMA_BASE_URL, OLLAMA_MODEL)
+_auto_ctx, _auto_predict = _auto_token_limits(_system_ram, _model_max_ctx)
+
+OLLAMA_CONTEXT_LENGTH = (
+    _auto_ctx if OLLAMA_CONTEXT_LENGTH_SETTING == "auto"
+    else int(OLLAMA_CONTEXT_LENGTH_SETTING)
+)
+OLLAMA_NUM_PREDICT = (
+    _auto_predict if OLLAMA_NUM_PREDICT_SETTING == "auto"
+    else int(OLLAMA_NUM_PREDICT_SETTING)
+)
+
+# Log what was detected (visible in run.sh output)
+print(f"  System: {_system_ram}GB RAM | Model max context: {_model_max_ctx or 'unknown'}")
+print(f"  Token limits: context={OLLAMA_CONTEXT_LENGTH}, predict={OLLAMA_NUM_PREDICT}"
+      f" ({'auto' if OLLAMA_CONTEXT_LENGTH_SETTING == 'auto' else 'manual'})")
 
 # System prompt for the assistant
 LLM_SYSTEM_PROMPT = """You are Daedalus, a knowledgeable audio plugin assistant. You help the user manage,
