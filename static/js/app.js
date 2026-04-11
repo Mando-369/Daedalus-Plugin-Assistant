@@ -92,6 +92,7 @@ const App = (() => {
     }
 
     let currentAssistantEl = null;
+    let isInThinking = false;
 
     function handleWSMessage(event) {
         const data = JSON.parse(event.data);
@@ -106,7 +107,46 @@ const App = (() => {
                     currentAssistantEl._sources = data.content;
                 }
                 break;
+            case 'thinking':
+                if (currentAssistantEl) {
+                    // Create thinking block on first thinking token
+                    if (!isInThinking) {
+                        isInThinking = true;
+                        const body = currentAssistantEl.querySelector('.msg-body');
+                        const thinkBlock = document.createElement('details');
+                        thinkBlock.className = 'msg-thinking';
+                        thinkBlock.open = true;
+                        thinkBlock.innerHTML = `
+                            <summary>Reasoning</summary>
+                            <div class="thinking-content"></div>
+                        `;
+                        // Insert before msg-text
+                        const msgText = body.querySelector('.msg-text');
+                        body.insertBefore(thinkBlock, msgText);
+                    }
+                    const thinkContent = currentAssistantEl.querySelector('.thinking-content');
+                    if (thinkContent) thinkContent.textContent += data.content;
+                    scrollChat();
+                }
+                break;
+            case 'content':
+                if (currentAssistantEl) {
+                    // Collapse thinking when answer starts
+                    if (isInThinking) {
+                        isInThinking = false;
+                        const thinkBlock = currentAssistantEl.querySelector('.msg-thinking');
+                        if (thinkBlock) thinkBlock.open = false;
+                        // Remove status
+                        const status = currentAssistantEl.querySelector('.msg-status');
+                        if (status) status.remove();
+                    }
+                    const body = currentAssistantEl.querySelector('.msg-text');
+                    if (body) body.textContent += data.content;
+                    scrollChat();
+                }
+                break;
             case 'token':
+                // Legacy fallback for models that don't separate thinking
                 if (currentAssistantEl) {
                     const body = currentAssistantEl.querySelector('.msg-text');
                     if (body) body.textContent += data.content;
@@ -115,6 +155,7 @@ const App = (() => {
                 break;
             case 'done':
                 if (currentAssistantEl) {
+                    isInThinking = false;
                     // Remove status
                     const status = currentAssistantEl.querySelector('.msg-status');
                     if (status) status.remove();
@@ -131,7 +172,7 @@ const App = (() => {
                         });
                         body.appendChild(sourcesDiv);
                     }
-                    // Store in history
+                    // Store in history (answer only, not thinking)
                     const text = currentAssistantEl.querySelector('.msg-text').textContent;
                     chatHistory.push({ role: 'assistant', content: text });
                     currentAssistantEl = null;
@@ -139,6 +180,7 @@ const App = (() => {
                 break;
             case 'error':
                 if (currentAssistantEl) {
+                    isInThinking = false;
                     const body = currentAssistantEl.querySelector('.msg-text');
                     body.textContent = `Error: ${data.content}`;
                     body.style.color = 'var(--error)';
@@ -197,9 +239,10 @@ const App = (() => {
     // ── Browse / Filter ─────────────────────────
     async function loadFilters() {
         try {
-            const [cats, devs] = await Promise.all([
+            const [cats, devs, subcats] = await Promise.all([
                 fetch('/api/categories').then(r => r.json()),
                 fetch('/api/developers').then(r => r.json()),
+                fetch('/api/subcategories').then(r => r.json()),
             ]);
 
             const catSelect = document.getElementById('filter-category');
@@ -217,6 +260,16 @@ const App = (() => {
                     catList.appendChild(dlOpt);
                 }
             });
+
+            // Populate subcategory datalist for edit modal
+            const subcatList = document.getElementById('subcategory-list');
+            if (subcatList) {
+                subcats.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    subcatList.appendChild(opt);
+                });
+            }
 
             const devSelect = document.getElementById('filter-developer');
             devs.forEach(d => {
@@ -404,7 +457,7 @@ const App = (() => {
                             <span class="confidence-dot ${conf}" title="${conf}"></span>
                             ${esc(p.display_name || p.name)}
                         </span>
-                        <span class="plugin-format">${esc(p.format)} ${esc(p.install_scope)}</span>
+                        <span class="plugin-format">${p.formats ? p.formats.join(' | ') : esc(p.format)}</span>
                     </div>
                     ${p.developer ? `<div class="plugin-developer">${esc(p.developer)}</div>` : ''}
                     ${p.description ? `<div class="plugin-description">${esc(p.description)}</div>` : ''}
@@ -466,7 +519,8 @@ const App = (() => {
 
             // Meta info
             const meta = [];
-            if (p.format) meta.push(`${p.format} (${p.install_scope})`);
+            if (p.formats) meta.push(p.formats.join(' | '));
+            else if (p.format) meta.push(p.format);
             if (p.file_name) meta.push(p.file_name);
             if (p.classification_confidence) meta.push(`Confidence: ${p.classification_confidence}`);
             document.getElementById('edit-meta').textContent = meta.join(' | ');

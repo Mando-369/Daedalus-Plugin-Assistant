@@ -204,29 +204,18 @@ SCANNER_SKIP_PATTERNS = ["old test plugins"]  # directories/files to skip
 # ──────────────────────────────────────────────
 # Own Plugin Detection
 # ──────────────────────────────────────────────
+# Add your own plugin names here, grouped by brand.
+# The scanner uses these to flag plugins as "own" in the database.
+# Example:
+#   "MyDSP": ["MyCompressor", "MySynth"],
+#   "Prototypes": ["TestPlugin1", "TestPlugin2"],
 OWN_PLUGIN_BRANDS = {
-    "Mandolini Audio": [
-        "THE LIMITER", "THE TRANSFORMER", "THE-GRAPHIC-EQ",
-        "TM_THE_GRAPHIC_EQ", "TM_THE_TRANSFORMER", "TM IR Convolver",
-        "TM_FSM_TAPE_5_proto2", "TM700V2",
-    ],
-    "OmegaDSP": [
-        "Angelizer", "Gravitas", "Kalos", "Symmetria", "Polymera",
-        "Magnetic Master Suite", "Xenia", "XeniaFX",
-        "OsTIrus", "OsTIrusFX", "Osirus", "OsirusFX",
-        "Vavra", "VavraFX", "thauma",
-    ],
-    "Development/Prototype": [
-        "FirstDSP", "SimpleAnalogSaturation", "TransparentClipper",
-        "BJT Clipper", "ZenerCapSat", "XMCompressor", "XMEQ", "XMLimiter",
-        "XMTape&Clip", "XMTubePre", "TUDI_Limiter", "EQP-WDF-1A",
-        "MASTERING_EQ_FAUST", "FSM_Tape", "FSM_Tape_LUT",
-        "FSMInspiredTapeModel", "JA_Hysteresis", "Polarity-MD",
-        "ja_tabulateNd", "ja_streaming_bias", "jahysteresis",
-        "TS_Derivative", "TS_FIR", "TS_IIR_Gauss", "TS_Slew",
-        "FAUST_TX81Z", "Ultramaster KR-106", "InOut_Transformer",
-        "NodalRed2x",
-    ],
+    # "MyDSP": [
+    #     "MyPlugin1", "MyPlugin2",
+    # ],
+    # "Prototypes": [
+    #     "TestCompressor", "TestEQ",
+    # ],
 }
 
 # ──────────────────────────────────────────────

@@ -34,9 +34,9 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         display_name TEXT,              -- cleaned/friendly name
-        developer TEXT,                 -- e.g. 'FabFilter', 'Universal Audio', 'Mandolini Audio'
+        developer TEXT,                 -- e.g. 'FabFilter', 'Universal Audio'
         is_own_plugin INTEGER DEFAULT 0, -- 1 if user's own development plugin
-        own_brand TEXT,                 -- e.g. 'OmegaDSP', 'Mandolini Audio', 'GRAME'
+        own_brand TEXT,                 -- e.g. 'MyDSP', 'My Brand'
 
         -- Format & location
         format TEXT,                    -- 'AU' or 'VST3'

@@ -312,9 +312,13 @@ class RAGPipeline:
                 for line in response.iter_lines():
                     if line:
                         chunk = json.loads(line)
-                        content = chunk.get("message", {}).get("content", "")
+                        msg = chunk.get("message", {})
+                        thinking = msg.get("thinking", "")
+                        content = msg.get("content", "")
+                        if thinking:
+                            yield ("thinking", thinking)
                         if content:
-                            yield content
+                            yield ("content", content)
                         if chunk.get("done"):
                             break
 

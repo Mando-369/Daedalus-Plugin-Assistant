@@ -133,7 +133,8 @@
                         </div>
                         <div class="form-group">
                             <label for="edit-subcategory">Subcategory</label>
-                            <input type="text" id="edit-subcategory">
+                            <input type="text" id="edit-subcategory" list="subcategory-list">
+                            <datalist id="subcategory-list"></datalist>
                         </div>
                         <div class="form-group">
                             <label for="edit-subtype">Subtype</label>
@@ -143,6 +144,7 @@
                                 <option value="emulation">Emulation</option>
                                 <option value="clone">Clone</option>
                                 <option value="utility">Utility</option>
+                                <option value="special">Special</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -196,7 +198,7 @@
                         </label>
                         <div class="form-group" id="own-brand-group">
                             <label for="edit-own_brand">Brand</label>
-                            <input type="text" id="edit-own_brand" placeholder="e.g. OmegaDSP">
+                            <input type="text" id="edit-own_brand" placeholder="e.g. MyDSP">
                         </div>
                     </div>
 

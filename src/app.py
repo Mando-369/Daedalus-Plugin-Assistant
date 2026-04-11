@@ -146,22 +146,56 @@ async def list_plugins(
             sort_by = "name"
         sort_dir = "DESC" if sort_dir.lower() == "desc" else "ASC"
 
-        # Count total
-        count_sql = f"SELECT COUNT(*) as total FROM plugins WHERE {where}"
+        # Consolidate: group same-name plugins across formats (AU/VST3)
+        # Use the row with the best classification as the representative
+        count_sql = f"""
+            SELECT COUNT(DISTINCT LOWER(name)) as total
+            FROM plugins WHERE {where}
+        """
         total = conn.execute(count_sql, params).fetchone()["total"]
 
-        # Fetch page
-        offset = (page - 1) * per_page
+        # Fetch all matching rows, then consolidate in Python
+        # (SQLite GROUP BY can't easily pick the "best" row + aggregate formats)
         data_sql = f"""
             SELECT * FROM plugins WHERE {where}
             ORDER BY {sort_by} {sort_dir}
-            LIMIT ? OFFSET ?
         """
-        params.extend([per_page, offset])
         rows = conn.execute(data_sql, params).fetchall()
 
+        # Group by lowercase name, keep best-classified row, merge formats
+        consolidated = {}
+        confidence_rank = {"high": 3, "medium": 2, "low": 1, "unclassified": 0}
+        for r in rows:
+            row = dict(r)
+            key = row["name"].lower()
+            if key not in consolidated:
+                row["formats"] = [row["format"]]
+                row["all_ids"] = [row["id"]]
+                consolidated[key] = row
+            else:
+                existing = consolidated[key]
+                # Add format if not already present
+                if row["format"] not in existing["formats"]:
+                    existing["formats"].append(row["format"])
+                existing["all_ids"].append(row["id"])
+                # Replace representative if this row has better classification
+                existing_rank = confidence_rank.get(existing.get("classification_confidence", ""), 0)
+                new_rank = confidence_rank.get(row.get("classification_confidence", ""), 0)
+                if new_rank > existing_rank:
+                    formats = existing["formats"]
+                    all_ids = existing["all_ids"]
+                    consolidated[key] = row
+                    consolidated[key]["formats"] = formats
+                    consolidated[key]["all_ids"] = all_ids
+
+        # Sort and paginate the consolidated list
+        all_plugins = list(consolidated.values())
+        offset = (page - 1) * per_page
+        total = len(all_plugins)
+        page_plugins = all_plugins[offset : offset + per_page]
+
         return {
-            "plugins": [dict(r) for r in rows],
+            "plugins": page_plugins,
             "total": total,
             "page": page,
             "per_page": per_page,
@@ -238,7 +272,7 @@ async def list_categories():
             FROM plugins
             WHERE category IS NOT NULL
             GROUP BY category
-            ORDER BY count DESC
+            ORDER BY category ASC
         """).fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -255,9 +289,25 @@ async def list_developers():
             FROM plugins
             WHERE developer IS NOT NULL AND developer != ''
             GROUP BY developer
-            ORDER BY count DESC
+            ORDER BY developer ASC
         """).fetchall()
         return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+@app.get("/api/subcategories")
+async def list_subcategories():
+    """Get all subcategories alphabetically."""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT DISTINCT subcategory
+            FROM plugins
+            WHERE subcategory IS NOT NULL AND subcategory != ''
+            ORDER BY subcategory ASC
+        """).fetchall()
+        return [r["subcategory"] for r in rows]
     finally:
         conn.close()
 
@@ -380,10 +430,10 @@ async def websocket_chat(websocket: WebSocket):
                     "content": "Generating response..."
                 })
 
-                for token in rag.generate_stream(user_query, context, history):
+                for token_type, token_text in rag.generate_stream(user_query, context, history):
                     await websocket.send_json({
-                        "type": "token",
-                        "content": token,
+                        "type": token_type,  # "thinking" or "content"
+                        "content": token_text,
                     })
 
                 await websocket.send_json({"type": "done"})

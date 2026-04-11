@@ -295,6 +295,45 @@ body {
     color: var(--text-accent);
 }
 
+.msg-thinking {
+    margin-bottom: 8px;
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.msg-thinking summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    background: rgba(168, 85, 247, 0.06);
+    user-select: none;
+}
+
+.msg-thinking summary:hover {
+    color: var(--text-primary);
+    background: rgba(168, 85, 247, 0.1);
+}
+
+.msg-thinking .thinking-content {
+    padding: 8px 10px;
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    font-style: italic;
+    background: rgba(15, 17, 23, 0.5);
+    white-space: pre-wrap;
+    overflow-y: auto;
+    resize: vertical;
+    min-height: 2rem;
+    max-height: 50vh;
+    height: 8rem;
+    line-height: 1.5;
+}
+
 .msg-status {
     padding: 6px 0;
     font-size: var(--font-size-sm);
