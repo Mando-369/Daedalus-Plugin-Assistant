@@ -62,7 +62,7 @@ OLLAMA_TIMEOUT = 120           # seconds to wait for LLM response
 OLLAMA_CONTEXT_LENGTH = 8192   # max context window tokens
 OLLAMA_TEMPERATURE = 0.3       # lower = more factual, higher = more creative
 OLLAMA_TOP_P = 0.9
-OLLAMA_NUM_PREDICT = 2048      # max tokens in response
+OLLAMA_NUM_PREDICT = 8192      # max tokens in response (qwen3.5 uses internal reasoning that consumes tokens)
 OLLAMA_KEEP_ALIVE = "10m"      # keep model loaded in memory
 
 # System prompt for the assistant

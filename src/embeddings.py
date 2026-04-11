@@ -119,9 +119,12 @@ class PluginEmbeddingStore:
             metadatas = []
 
             for p in batch:
-                # Use a stable ID: name_format_scope
-                doc_id = f"{p.get('name', 'unknown')}_{p.get('format', '')}_{p.get('install_scope', '')}".lower()
-                doc_id = doc_id.replace(" ", "_")
+                # Use a stable ID: prefer DB id, fall back to file_name_format_scope
+                if p.get("id"):
+                    doc_id = f"plugin_{p['id']}"
+                else:
+                    doc_id = f"{p.get('file_name', p.get('name', 'unknown'))}_{p.get('format', '')}_{p.get('install_scope', '')}".lower()
+                    doc_id = doc_id.replace(" ", "_")
 
                 ids.append(doc_id)
                 documents.append(self._build_document(p))
