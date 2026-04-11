@@ -719,6 +719,8 @@ body {
     border-radius: var(--radius);
 }
 
+.hidden { display: none !important; }
+
 .enriched-field {
     outline: 2px solid var(--accent);
     transition: outline 0.3s ease;

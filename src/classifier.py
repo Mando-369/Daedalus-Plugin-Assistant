@@ -3520,10 +3520,12 @@ def classify_all(plugins: list[dict]) -> list[dict]:
 
     for plugin in plugins:
         classification = classify_plugin(plugin["name"])
-        # Don't overwrite scanner-provided developer with empty classifier result
-        if plugin.get("developer") and not classification.get("developer"):
-            classification.pop("developer", None)
+        # Scanner's plist-extracted developer is authoritative (comes from the
+        # plugin bundle itself). Never overwrite it with classifier's hardcoded data.
+        scanner_developer = plugin.get("developer")
         plugin.update(classification)
+        if scanner_developer:
+            plugin["developer"] = scanner_developer
 
         conf = classification.get("classification_confidence", "unclassified")
         if conf == "high":
