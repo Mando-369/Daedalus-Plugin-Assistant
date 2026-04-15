@@ -29,12 +29,21 @@
 - [ ] Settings tab in UI for LLM backend configuration:
   - Local Ollama (auto-detected models, system spec check)
   - Remote Ollama (custom URL for cloud-hosted instances)
-  - Cloud providers: OpenAI, Anthropic, Google, DeepSeek, Qwen API
-  - OpenAI-compatible endpoints (covers most providers)
+  - Cloud providers via OpenAI-compatible API:
+    - Google Gemini 2.5 Flash / 3.0 Flash-Lite (recommended online default: free tier 1000 req/day, 1M+ token context)
+    - OpenAI, Anthropic, DeepSeek, Qwen API
   - Model selection with capability info (size, context window, speed)
   - API key management (stored locally in SQLite, never leaves the machine)
-- [ ] Auto-fallback: detect small systems (<16GB RAM) and suggest/enable online LLM
-- [ ] Separate model config per purpose: chat model vs agent model (e.g. fast local for agents, powerful cloud for chat)
+- [ ] Auto-fallback: detect small systems (<16GB RAM) and suggest/enable online LLM (Gemini free tier)
+- [ ] Separate model config per purpose:
+  - Chat: larger/cloud model for better responses (Gemini Flash or local 26B+)
+  - Agents: fast local model for tool-calling decisions (Gemma 4 26B or Qwen 3.5 14B)
+  - Embeddings: keep nomic-embed-text local (fast, no API needed)
+- [ ] Recommended defaults by system:
+  - Mac 32GB+: Gemma 4 26B local (all purposes)
+  - Mac 16GB: Qwen 3.5 14B Q4 local (~9GB, 45 tok/s)
+  - Windows 16GB VRAM: Gemma 4 26B-A4B via LM Studio
+  - Low-spec / no GPU: Gemini Flash online (free)
 - [ ] Test connection button in settings
 
 ### Enrichment Improvements
