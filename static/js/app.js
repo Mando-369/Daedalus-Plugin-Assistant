@@ -1121,12 +1121,16 @@ const App = (() => {
 
             // Fill form
             const provider = settings.llm_provider || 'ollama';
+            const savedModel = settings.llm_model || PROVIDER_MODELS[provider] || '';
             document.getElementById('set-llm-provider').value = provider;
-            document.getElementById('set-llm-model').value = settings.llm_model || PROVIDER_MODELS[provider] || '';
             document.getElementById('set-llm-url').value = settings.llm_base_url || PROVIDER_URLS[provider] || '';
             document.getElementById('set-llm-key').value = '';
             document.getElementById('set-llm-temp').value = settings.llm_temperature || '0.3';
             document.getElementById('set-llm-temp-val').textContent = settings.llm_temperature || '0.3';
+
+            // Load models then select the saved one
+            await _loadModels('llm', provider);
+            document.getElementById('set-llm-model').value = savedModel;
 
             onProviderChange('llm');
 
@@ -1135,6 +1139,7 @@ const App = (() => {
                 document.getElementById('set-agent-same').checked = false;
                 document.getElementById('agent-settings').classList.remove('hidden');
                 document.getElementById('set-agent-provider').value = settings.agent_provider;
+                await _loadModels('agent', settings.agent_provider);
                 document.getElementById('set-agent-model').value = settings.agent_model || '';
             }
 
@@ -1152,12 +1157,9 @@ const App = (() => {
         const urlEl = document.getElementById(`${prefix}-url-group`);
         const keyEl = document.getElementById(`${prefix}-key-group`);
 
-        // Auto-fill URL and model
+        // Auto-fill URL
         if (PROVIDER_URLS[provider] !== undefined) {
             document.getElementById(`set-${prefix}-url`).value = PROVIDER_URLS[provider];
-        }
-        if (PROVIDER_MODELS[provider]) {
-            document.getElementById(`set-${prefix}-model`).value = PROVIDER_MODELS[provider];
         }
 
         // Show/hide API key field
@@ -1175,6 +1177,44 @@ const App = (() => {
             hintEl.innerHTML = PROVIDER_HINTS[provider];
         } else if (hintEl) {
             hintEl.innerHTML = '';
+        }
+
+        // Fetch available models
+        _loadModels(prefix, provider);
+    }
+
+    async function _loadModels(prefix, provider) {
+        const select = document.getElementById(`set-${prefix}-model`);
+        const defaultModel = PROVIDER_MODELS[provider] || '';
+        const baseUrl = document.getElementById(`set-${prefix}-url`)?.value || '';
+        const apiKey = document.getElementById(`set-${prefix}-key`)?.value || '';
+
+        // Reset to default while loading
+        select.innerHTML = `<option value="${defaultModel}">${defaultModel || 'Loading...'}</option>`;
+
+        try {
+            const params = new URLSearchParams({ provider });
+            if (baseUrl) params.set('base_url', baseUrl);
+            if (apiKey) params.set('api_key', apiKey);
+
+            const resp = await fetch(`/api/settings/models?${params}`);
+            const data = await resp.json();
+            const models = data.models || [];
+
+            if (models.length) {
+                select.innerHTML = models.map(m =>
+                    `<option value="${m}" ${m === defaultModel ? 'selected' : ''}>${m}</option>`
+                ).join('');
+                // If current default isn't in list, add it
+                if (defaultModel && !models.includes(defaultModel)) {
+                    select.insertAdjacentHTML('afterbegin',
+                        `<option value="${defaultModel}" selected>${defaultModel} (default)</option>`);
+                }
+            } else {
+                select.innerHTML = `<option value="${defaultModel}">${defaultModel || 'No models found'}</option>`;
+            }
+        } catch (e) {
+            select.innerHTML = `<option value="${defaultModel}">${defaultModel || 'Error loading models'}</option>`;
         }
     }
 

@@ -17,6 +17,7 @@ os.environ["CHROMA_TELEMETRY"] = "False"
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import httpx
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -990,6 +991,32 @@ async def update_settings(settings: dict):
     reload_clients()
 
     return {"status": "updated"}
+
+
+@app.get("/api/settings/models")
+async def list_models(provider: str = "ollama", base_url: str = None, api_key: str = None):
+    """List available models for a provider."""
+    try:
+        if provider == "ollama":
+            url = base_url or "http://127.0.0.1:11434"
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(f"{url}/api/tags")
+                resp.raise_for_status()
+                models = [m["name"] for m in resp.json().get("models", [])]
+                return {"models": sorted(models)}
+        else:
+            # OpenAI-compatible: try /models endpoint
+            url = base_url or "https://openrouter.ai/api/v1"
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"{url}/models", headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    models = [m["id"] for m in data.get("data", [])]
+                    return {"models": sorted(models)[:50]}
+                return {"models": []}
+    except Exception as e:
+        return {"models": [], "error": str(e)}
 
 
 @app.post("/api/settings/test")
