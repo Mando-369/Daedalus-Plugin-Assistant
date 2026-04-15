@@ -2,6 +2,11 @@
 
 A local macOS application that manages, classifies, and provides intelligent search across your AU and VST3 audio plugin collection using autonomous AI agents and a local LLM via Ollama.
 
+![Chat](docs/screenshots/chat.png)
+![Browse](docs/screenshots/browse.png)
+![Edit & Enrich](docs/screenshots/edit.png)
+![Settings](docs/screenshots/settings.png)
+
 ## Features
 
 - **Automatic Plugin Discovery** -- Scans standard macOS plugin directories for AU and VST3 formats
