@@ -65,6 +65,14 @@ class AgentRunner:
                     func = tc.get("function", {})
                     tool_name = func.get("name", "")
                     tool_args = func.get("arguments", {})
+                    tool_call_id = tc.get("id", "")
+
+                    # OpenAI-compatible APIs return arguments as JSON string
+                    if isinstance(tool_args, str):
+                        try:
+                            tool_args = json.loads(tool_args)
+                        except json.JSONDecodeError:
+                            tool_args = {}
 
                     if on_step:
                         on_step("tool_call", {"name": tool_name, "args": tool_args})
@@ -83,11 +91,11 @@ class AgentRunner:
                     if on_step:
                         on_step("tool_result", {"name": tool_name, "result": result_str[:200]})
 
-                    # Append tool result
-                    messages.append({
-                        "role": "tool",
-                        "content": result_str,
-                    })
+                    # Append tool result (include tool_call_id for OpenAI-compatible APIs)
+                    tool_msg = {"role": "tool", "content": result_str}
+                    if tool_call_id:
+                        tool_msg["tool_call_id"] = tool_call_id
+                    messages.append(tool_msg)
 
                 continue  # Next iteration with tool results
 
