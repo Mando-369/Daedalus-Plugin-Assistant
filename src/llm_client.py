@@ -17,16 +17,17 @@ import httpx
 # Known provider base URLs
 PROVIDER_URLS = {
     "ollama": "http://127.0.0.1:11434",
+    "openrouter": "https://openrouter.ai/api/v1",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
     "openai": "https://api.openai.com/v1",
-    "anthropic": "https://api.anthropic.com/v1",
     "deepseek": "https://api.deepseek.com",
 }
 
 # Default models per provider
 PROVIDER_DEFAULTS = {
     "ollama": "gemma4:26b",
-    "gemini": "gemini-2.5-flash",
+    "openrouter": "openrouter/free",  # auto-picks best free model, works globally
+    "gemini": "gemini-2.5-flash",     # NOTE: free tier NOT available in EU/EEA/UK
     "openai": "gpt-4o-mini",
     "deepseek": "deepseek-chat",
 }

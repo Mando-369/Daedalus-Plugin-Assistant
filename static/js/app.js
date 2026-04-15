@@ -966,6 +966,7 @@ const App = (() => {
     // ── Settings ────────────────────────────────
     const PROVIDER_URLS = {
         ollama: 'http://127.0.0.1:11434',
+        openrouter: 'https://openrouter.ai/api/v1',
         gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
         openai: 'https://api.openai.com/v1',
         deepseek: 'https://api.deepseek.com',
@@ -973,6 +974,7 @@ const App = (() => {
 
     const PROVIDER_MODELS = {
         ollama: 'gemma4:26b',
+        openrouter: 'openrouter/free',
         gemini: 'gemini-2.5-flash',
         openai: 'gpt-4o-mini',
         deepseek: 'deepseek-chat',

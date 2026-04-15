@@ -134,7 +134,8 @@
                             <label for="set-llm-provider">Provider</label>
                             <select id="set-llm-provider" onchange="App.onProviderChange('llm')">
                                 <option value="ollama">Local Ollama</option>
-                                <option value="gemini">Google Gemini</option>
+                                <option value="openrouter">OpenRouter (free models, global)</option>
+                                <option value="gemini">Google Gemini (not free in EU)</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="custom">Custom (OpenAI-compatible)</option>
@@ -176,6 +177,7 @@
                                 <label for="set-agent-provider">Provider</label>
                                 <select id="set-agent-provider">
                                     <option value="ollama">Local Ollama</option>
+                                    <option value="openrouter">OpenRouter (free)</option>
                                     <option value="gemini">Google Gemini</option>
                                     <option value="openai">OpenAI</option>
                                     <option value="deepseek">DeepSeek</option>
