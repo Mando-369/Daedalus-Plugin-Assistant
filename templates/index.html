@@ -91,6 +91,12 @@
                     <input type="checkbox" id="filter-own" onchange="App.loadPlugins()"> My plugins
                 </label>
             </div>
+            <div class="confidence-legend">
+                <span class="confidence-dot high"></span> Fully classified
+                <span class="confidence-dot medium"></span> Partially classified
+                <span class="confidence-dot low"></span> Low confidence
+                <span class="confidence-dot unclassified"></span> Unclassified
+            </div>
             <div id="browse-info" class="browse-info"></div>
             <div id="plugin-list" class="plugin-grid"></div>
             <div id="pagination" class="pagination"></div>

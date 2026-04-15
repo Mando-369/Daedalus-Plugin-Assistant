@@ -643,6 +643,19 @@ body {
     border-radius: 50%;
     margin-right: 4px;
 }
+.confidence-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 4px 0;
+}
+
+.confidence-legend .confidence-dot {
+    margin-right: 3px;
+}
+
 .confidence-dot.high { background: var(--success); }
 .confidence-dot.medium { background: var(--warning); }
 .confidence-dot.low { background: var(--error); }
