@@ -128,7 +128,7 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
                     ):
                         dev = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", raw)
                         dev = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", dev)
-                        result["developer"] = dev.strip()
+                        result["developer"] = _normalize_developer(dev.strip())
 
         return result
     except Exception:
@@ -138,10 +138,11 @@ def _extract_metadata_from_plist(bundle_path: str, fmt: str) -> dict:
 def _clean_copyright(text: str) -> str | None:
     """Clean a copyright string to extract the developer name."""
     s = text.strip()
-    # Remove copyright symbols and common prefixes
-    s = re.sub(r"^[\s\u00a9\u00ae\u2122(cC)©®™]+", "", s)
+    # Remove "Copyright" word first (before stripping symbols)
     s = re.sub(r"^Copyright\s*", "", s, flags=re.IGNORECASE)
+    # Remove (c), (C), and unicode copyright symbols
     s = re.sub(r"^\(c\)\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"^[\s\u00a9\u00ae\u2122©®™]+", "", s)
     # Remove year patterns (2010-2025, 2024, etc.)
     s = re.sub(r"\b\d{4}\s*[-–]\s*\d{4}\b", "", s)
     s = re.sub(r"\b\d{4}\b", "", s)
@@ -152,7 +153,46 @@ def _clean_copyright(text: str) -> str | None:
     s = re.sub(r"\s*[-–—.]+\s*$", "", s)
     s = re.sub(r"^\s*[-–—.]+\s*", "", s)
     s = s.strip(" .,;:-–—")
-    return s if s else None
+    # Reject garbage results from bad copyright strings
+    if not s or len(s) < 2:
+        return None
+    reject = {"copyright", "opyright", "all rights reserved", "inc", "ltd", "llc"}
+    if s.lower() in reject:
+        return None
+    return _normalize_developer(s)
+
+
+# Known developer name corrections (lowercase → proper)
+_DEVELOPER_NORMALIZE = {
+    "izotope": "iZotope",
+    "softube": "Softube",
+    "grame": "GRAME",
+    "fabfilter": "FabFilter",
+    "meldaproduction": "MeldaProduction",
+    "pspaudioware": "PSPaudioware",
+    "kilohearts": "Kilohearts",
+    "eventide": "Eventide",
+    "soundtoys": "Soundtoys",
+    "plugin alliance": "Plugin Alliance",
+    "native instruments": "Native Instruments",
+    "waves": "Waves",
+    "slate digital": "Slate Digital",
+    "u-he": "u-he",
+}
+
+
+def _normalize_developer(name: str) -> str:
+    """Normalize developer name casing."""
+    if not name:
+        return name
+    # Check known names
+    normalized = _DEVELOPER_NORMALIZE.get(name.lower())
+    if normalized:
+        return normalized
+    # Single lowercase word → title case
+    if " " not in name and name == name.lower() and len(name) > 2:
+        return name.capitalize()
+    return name
 
 
 def detect_own_plugin(name: str) -> tuple[bool, str | None]:
@@ -274,7 +314,8 @@ def _cross_reference_metadata(plugins: list[dict]):
         key = p["name"].lower()
         if key in au_metadata:
             au = au_metadata[key]
-            if not p.get("developer") and au.get("developer"):
+            # AU developer is always authoritative (proper casing from AudioComponents)
+            if au.get("developer"):
                 p["developer"] = au["developer"]
                 propagated += 1
             if not p.get("plugin_type") and au.get("plugin_type"):
