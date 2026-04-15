@@ -233,7 +233,7 @@ def scan_plugins(scan_dirs: list[dict] = None) -> list[dict]:
     seen = set()
 
     for scan_dir in scan_dirs:
-        dir_path = scan_dir["path"]
+        dir_path = os.path.expanduser(scan_dir["path"])
         fmt = scan_dir["format"]
         scope = scan_dir["scope"]
         ext = scan_dir["extension"]

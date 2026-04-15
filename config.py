@@ -111,13 +111,13 @@ PLUGIN_SCAN_DIRS = [
         "extension": ".vst3",
     },
     {
-        "path": os.path.expanduser("~/Library/Audio/Plug-Ins/Components"),
+        "path": "~/Library/Audio/Plug-Ins/Components",
         "format": "AU",
         "scope": "user",
         "extension": ".component",
     },
     {
-        "path": os.path.expanduser("~/Library/Audio/Plug-Ins/VST3"),
+        "path": "~/Library/Audio/Plug-Ins/VST3",
         "format": "VST3",
         "scope": "user",
         "extension": ".vst3",
