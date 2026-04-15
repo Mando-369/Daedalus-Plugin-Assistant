@@ -376,23 +376,16 @@ const App = (() => {
         const current = select.value;
 
         try {
-            const resp = await fetch('/api/plugins?needs_review=true&per_page=9999');
-            const data = await resp.json();
-            const devs = {};
-            (data.plugins || []).forEach(p => {
-                if (p.developer) devs[p.developer] = (devs[p.developer] || 0) + 1;
-            });
+            const resp = await fetch('/api/review-developers');
+            const devs = await resp.json();
 
-            // Reset and rebuild
             select.innerHTML = '<option value="">All Developers</option>';
-            Object.entries(devs)
-                .sort((a, b) => a[0].localeCompare(b[0]))
-                .forEach(([dev, count]) => {
-                    const opt = document.createElement('option');
-                    opt.value = dev;
-                    opt.textContent = `${dev} (${count})`;
-                    select.appendChild(opt);
-                });
+            devs.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d.developer;
+                opt.textContent = `${d.developer} (${d.count})`;
+                select.appendChild(opt);
+            });
             select.value = current;
         } catch (e) {
             console.error('Failed to load review developers:', e);

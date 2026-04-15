@@ -638,6 +638,24 @@ async def web_search_api(request: WebSearchRequest):
     return {"results": enriched}
 
 
+@app.get("/api/review-developers")
+async def list_review_developers():
+    """Get developers that have plugins needing review."""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT developer, COUNT(DISTINCT LOWER(name)) as count
+            FROM plugins
+            WHERE needs_review = 1
+              AND developer IS NOT NULL AND developer != ''
+            GROUP BY developer
+            ORDER BY developer ASC
+        """).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 # ── Scan Directories API ──────────────────────────
 
 def _get_scan_dirs() -> list[dict]:
