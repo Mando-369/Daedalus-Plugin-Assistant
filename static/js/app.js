@@ -842,6 +842,21 @@ const App = (() => {
         const id = document.getElementById('edit-id').value;
         if (!id) return;
 
+        // Check if plugin already has enriched data
+        const hasData = document.getElementById('edit-description').value.trim()
+                     || document.getElementById('edit-character').value.trim()
+                     || document.getElementById('edit-specialty').value.trim();
+
+        let force = false;
+        if (hasData) {
+            const choice = confirm(
+                'This plugin already has enrichment data.\n\n' +
+                'OK = Replace existing data with fresh research\n' +
+                'Cancel = Keep existing data, only fill empty fields'
+            );
+            force = choice;
+        }
+
         const url = document.getElementById('enrich-url').value.trim() || undefined;
         const pdfPath = document.getElementById('enrich-pdf').value.trim() || undefined;
 
@@ -854,7 +869,7 @@ const App = (() => {
         statusEl.classList.remove('hidden');
 
         try {
-            const body = {};
+            const body = { force };
             if (url) body.url = url;
             if (pdfPath) body.pdf_path = pdfPath;
 

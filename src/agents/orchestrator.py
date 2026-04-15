@@ -36,6 +36,7 @@ class EnrichmentOrchestrator:
         plugin_id: int,
         url: str = None,
         pdf_path: str = None,
+        force: bool = False,
         on_step=None,
     ) -> dict:
         """Enrich a single plugin using goal-oriented agents.
@@ -123,8 +124,8 @@ class EnrichmentOrchestrator:
         # Validation: check if merged data is internally consistent
         merged = self._validate_result(plugin["name"], merged, on_step)
 
-        # Apply to DB (non-destructive)
-        applied = self._apply_to_db(plugin["name"], merged)
+        # Apply to DB
+        applied = self._apply_to_db(plugin["name"], merged, force=force)
 
         if on_step:
             on_step("done", "complete", {"applied": applied, "result": merged})
@@ -408,10 +409,11 @@ Return ONLY the JSON object."""
             "done": True,
         }
 
-    def _apply_to_db(self, plugin_name: str, data: dict) -> int:
+    def _apply_to_db(self, plugin_name: str, data: dict, force: bool = False) -> int:
         """Apply enrichment to all DB rows with this plugin name.
 
-        Non-destructive: only fills empty fields.
+        Non-destructive by default (only fills empty fields).
+        With force=True, overwrites existing fields with new data.
         Returns number of rows updated.
         """
         conn = get_db()
@@ -431,7 +433,7 @@ Return ONLY the JSON object."""
                     new_val = data.get(field)
                     if new_val and str(new_val).strip():
                         old_val = existing.get(field)
-                        if not old_val or old_val == "":
+                        if force or not old_val or old_val == "":
                             updates[field] = str(new_val).strip()
 
                 # Always re-evaluate confidence based on total filled state

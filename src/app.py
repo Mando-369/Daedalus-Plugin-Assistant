@@ -856,6 +856,7 @@ async def enrichment_status():
 class EnrichRequest(BaseModel):
     url: Optional[str] = None
     pdf_path: Optional[str] = None
+    force: Optional[bool] = False
 
 
 @app.post("/api/plugins/{plugin_id}/enrich")
@@ -880,6 +881,7 @@ async def enrich_plugin(plugin_id: int, request: EnrichRequest = EnrichRequest()
             plugin_id,
             url=request.url,
             pdf_path=request.pdf_path,
+            force=request.force,
         )
 
         # Re-embed affected plugins
