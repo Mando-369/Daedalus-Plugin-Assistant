@@ -939,10 +939,17 @@ const App = (() => {
 
             switch (data.type) {
                 case 'progress':
+                    fillEl.style.width = `${pct}%`;
+                    statusEl.textContent =
+                        `${data.processed}/${data.total} (${pct}%) — ${data.current || '...'} | enriched: ${stats.enriched || 0}`;
+                    break;
                 case 'enriched':
                     fillEl.style.width = `${pct}%`;
                     statusEl.textContent =
                         `${data.processed}/${data.total} (${pct}%) — ${data.current || '...'} | enriched: ${stats.enriched || 0}`;
+                    // Live-refresh: remove enriched plugins from review list
+                    loadReviewPlugins(reviewPage);
+                    loadReviewBadge();
                     break;
                 case 'error':
                     statusEl.textContent =
