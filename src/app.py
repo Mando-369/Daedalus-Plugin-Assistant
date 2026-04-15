@@ -385,7 +385,7 @@ async def list_categories():
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT category, COUNT(*) as count
+            SELECT category, COUNT(DISTINCT LOWER(name)) as count
             FROM plugins
             WHERE category IS NOT NULL
             GROUP BY category
@@ -402,7 +402,7 @@ async def list_developers():
     conn = get_db()
     try:
         rows = conn.execute("""
-            SELECT developer, COUNT(*) as count
+            SELECT developer, COUNT(DISTINCT LOWER(name)) as count
             FROM plugins
             WHERE developer IS NOT NULL AND developer != ''
             GROUP BY developer
@@ -434,33 +434,33 @@ async def get_stats():
     """Dashboard statistics."""
     conn = get_db()
     try:
-        total = conn.execute("SELECT COUNT(*) as c FROM plugins").fetchone()["c"]
+        total = conn.execute("SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins").fetchone()["c"]
         classified = conn.execute(
-            "SELECT COUNT(*) as c FROM plugins WHERE classification_confidence IN ('high', 'medium')"
+            "SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins WHERE classification_confidence IN ('high', 'medium')"
         ).fetchone()["c"]
         needs_review = conn.execute(
-            "SELECT COUNT(*) as c FROM plugins WHERE needs_review = 1"
+            "SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins WHERE needs_review = 1"
         ).fetchone()["c"]
         own_plugins = conn.execute(
-            "SELECT COUNT(*) as c FROM plugins WHERE is_own_plugin = 1"
+            "SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins WHERE is_own_plugin = 1"
         ).fetchone()["c"]
         instruments = conn.execute(
-            "SELECT COUNT(*) as c FROM plugins WHERE plugin_type = 'instrument'"
+            "SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins WHERE plugin_type = 'instrument'"
         ).fetchone()["c"]
         effects = conn.execute(
-            "SELECT COUNT(*) as c FROM plugins WHERE plugin_type = 'effect'"
+            "SELECT COUNT(DISTINCT LOWER(name)) as c FROM plugins WHERE plugin_type = 'effect'"
         ).fetchone()["c"]
 
         # Top categories
         top_cats = conn.execute("""
-            SELECT category, COUNT(*) as count
+            SELECT category, COUNT(DISTINCT LOWER(name)) as count
             FROM plugins WHERE category IS NOT NULL
             GROUP BY category ORDER BY count DESC LIMIT 10
         """).fetchall()
 
         # Top developers
         top_devs = conn.execute("""
-            SELECT developer, COUNT(*) as count
+            SELECT developer, COUNT(DISTINCT LOWER(name)) as count
             FROM plugins WHERE developer IS NOT NULL AND developer != ''
             GROUP BY developer ORDER BY count DESC LIMIT 10
         """).fetchall()
