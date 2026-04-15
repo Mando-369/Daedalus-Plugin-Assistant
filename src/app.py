@@ -751,34 +751,87 @@ async def trigger_scan():
 
 @app.websocket("/ws/enrich")
 async def websocket_enrich(websocket: WebSocket):
-    """WebSocket endpoint for streaming enrichment progress using autonomous agents."""
+    """WebSocket endpoint for streaming enrichment with pause/resume/cancel."""
     await websocket.accept()
+    import queue as queue_mod
 
     try:
+        # Receive initial config
         data = await websocket.receive_text()
         msg = json.loads(data)
         limit = msg.get("limit")
         plugin_ids = msg.get("plugin_ids")
+        delay = msg.get("delay", 2)
+        batch_limit = msg.get("batch_limit", 0)
 
         from src.agents.orchestrator import EnrichmentOrchestrator
         orchestrator = EnrichmentOrchestrator()
 
+        # Shared state for pause/cancel control
+        state = {"paused": False, "cancelled": False, "delay": delay, "batch_limit": batch_limit}
+
+        # Queue bridges sync generator → async WebSocket
+        result_queue = queue_mod.Queue()
+
         def _run_batch():
-            return list(orchestrator.enrich_batch(
-                plugin_ids=plugin_ids, limit=limit,
-            ))
+            try:
+                for item in orchestrator.enrich_batch(
+                    plugin_ids=plugin_ids, limit=limit, state=state,
+                ):
+                    result_queue.put(item)
+            except Exception as e:
+                result_queue.put({"type": "error", "error": str(e), "done": True})
+            finally:
+                result_queue.put(None)  # sentinel
 
-        results = await asyncio.to_thread(_run_batch)
+        # Start generator in background thread
+        batch_task = asyncio.get_event_loop().run_in_executor(None, _run_batch)
 
-        for progress in results:
-            await websocket.send_json(progress)
+        # Stream results + listen for control messages
+        done = False
+        while not done:
+            # Check for results from generator (non-blocking)
+            try:
+                item = result_queue.get_nowait()
+                if item is None:
+                    done = True
+                    break
+                await websocket.send_json(item)
+                if item.get("done"):
+                    done = True
+            except queue_mod.Empty:
+                pass
+
+            # Check for control messages from frontend (non-blocking)
+            try:
+                control = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                ctrl = json.loads(control)
+                action = ctrl.get("action")
+                if action == "pause":
+                    state["paused"] = True
+                    await websocket.send_json({"type": "paused"})
+                elif action == "resume":
+                    state["paused"] = False
+                    await websocket.send_json({"type": "resumed"})
+                elif action == "cancel":
+                    state["cancelled"] = True
+                    state["paused"] = False  # unblock if paused
+                    await websocket.send_json({"type": "cancelling"})
+            except asyncio.TimeoutError:
+                pass
+            except WebSocketDisconnect:
+                state["cancelled"] = True
+                state["paused"] = False
+                done = True
+
+        await batch_task
 
     except WebSocketDisconnect:
         pass
     except Exception as e:
         traceback.print_exc()
         try:
-            await websocket.send_json({"type": "error", "error": str(e)})
+            await websocket.send_json({"type": "error", "error": str(e), "done": True})
         except Exception:
             pass
 

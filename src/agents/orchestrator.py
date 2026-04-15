@@ -131,11 +131,21 @@ class EnrichmentOrchestrator:
 
         return merged
 
-    def enrich_batch(self, plugin_ids: list[int] = None, limit: int = None):
+    def enrich_batch(self, plugin_ids: list[int] = None, limit: int = None,
+                     state: dict = None):
         """Generator yielding progress for bulk enrichment.
 
-        Yields dicts with: type, plugin_name, result, progress, total.
+        Args:
+            plugin_ids: Optional list of specific plugin IDs to enrich.
+            limit: Max number of plugins to process.
+            state: Shared dict for pause/cancel control. Keys:
+                   paused (bool), cancelled (bool), delay (int), batch_limit (int)
         """
+        import time
+
+        if state is None:
+            state = {}
+
         conn = get_db()
         try:
             if plugin_ids:
@@ -177,42 +187,121 @@ class EnrichmentOrchestrator:
         total = len(unique_plugins)
         enriched = 0
         errors = 0
+        delay = state.get("delay", 2)
+        batch_limit = state.get("batch_limit", 0)
 
         for i, plugin in enumerate(unique_plugins):
+            # Check cancel
+            if state.get("cancelled"):
+                yield {
+                    "type": "cancelled",
+                    "processed": i, "total": total,
+                    "stats": {"enriched": enriched, "errors": errors},
+                    "done": True,
+                }
+                return
+
+            # Check pause (wait until resumed)
+            while state.get("paused"):
+                time.sleep(0.5)
+                if state.get("cancelled"):
+                    yield {
+                        "type": "cancelled",
+                        "processed": i, "total": total,
+                        "stats": {"enriched": enriched, "errors": errors},
+                        "done": True,
+                    }
+                    return
+
+            # Auto-pause on batch limit
+            if batch_limit and i > 0 and i % batch_limit == 0:
+                state["paused"] = True
+                yield {
+                    "type": "auto_paused",
+                    "processed": i, "total": total,
+                    "current": plugin["name"],
+                    "stats": {"enriched": enriched, "errors": errors},
+                    "reason": f"Batch limit ({batch_limit}) reached. Click Resume to continue.",
+                    "done": False,
+                }
+                # Wait for resume
+                while state.get("paused"):
+                    time.sleep(0.5)
+                    if state.get("cancelled"):
+                        return
+
+            # Delay between plugins (prevents resource exhaustion)
+            if i > 0 and delay > 0:
+                time.sleep(delay)
+
+            # Progress announcement
             yield {
                 "type": "progress",
-                "plugin_name": plugin["name"],
-                "progress": i + 1,
-                "total": total,
-                "enriched": enriched,
-                "errors": errors,
+                "processed": i + 1, "total": total,
+                "current": plugin["name"],
+                "stats": {"enriched": enriched, "errors": errors},
+                "done": False,
             }
 
+            # Enrich the plugin
             try:
                 result = self.enrich_single(plugin["id"])
                 if result and not result.get("error"):
                     enriched += 1
                     yield {
                         "type": "enriched",
-                        "plugin_name": plugin["name"],
-                        "result": result,
+                        "processed": i + 1, "total": total,
+                        "current": plugin["name"],
+                        "stats": {"enriched": enriched, "errors": errors},
+                        "done": False,
                     }
                 else:
                     errors += 1
                     yield {
                         "type": "error",
-                        "plugin_name": plugin["name"],
-                        "error": result.get("error", "Unknown error"),
+                        "processed": i + 1, "total": total,
+                        "current": plugin["name"],
+                        "error": result.get("error", "Unknown"),
+                        "stats": {"enriched": enriched, "errors": errors},
+                        "done": False,
                     }
             except Exception as e:
+                error_msg = str(e)
                 errors += 1
-                yield {
-                    "type": "error",
-                    "plugin_name": plugin["name"],
-                    "error": str(e),
-                }
+
+                # Rate limit detection -- auto-pause
+                if "429" in error_msg or "rate" in error_msg.lower() or "quota" in error_msg.lower():
+                    state["paused"] = True
+                    yield {
+                        "type": "rate_limited",
+                        "processed": i + 1, "total": total,
+                        "current": plugin["name"],
+                        "stats": {"enriched": enriched, "errors": errors},
+                        "reason": f"Rate limited: {error_msg[:100]}. Auto-paused. Resume when ready.",
+                        "done": False,
+                    }
+                    while state.get("paused"):
+                        time.sleep(0.5)
+                        if state.get("cancelled"):
+                            return
+                else:
+                    yield {
+                        "type": "error",
+                        "processed": i + 1, "total": total,
+                        "current": plugin["name"],
+                        "error": error_msg,
+                        "stats": {"enriched": enriched, "errors": errors},
+                        "done": False,
+                    }
 
         # Re-embed all plugins after batch enrichment
+        yield {
+            "type": "progress",
+            "processed": total, "total": total,
+            "current": "Re-embedding plugins...",
+            "stats": {"enriched": enriched, "errors": errors},
+            "done": False,
+        }
         try:
             conn = get_db()
             all_plugins = [dict(r) for r in conn.execute("SELECT * FROM plugins").fetchall()]
@@ -225,9 +314,10 @@ class EnrichmentOrchestrator:
 
         yield {
             "type": "done",
-            "total": total,
-            "enriched": enriched,
-            "errors": errors,
+            "processed": total, "total": total,
+            "current": "",
+            "stats": {"enriched": enriched, "errors": errors},
+            "done": True,
         }
 
     def _apply_to_db(self, plugin_name: str, data: dict) -> int:

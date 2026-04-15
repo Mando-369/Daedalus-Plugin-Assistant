@@ -905,62 +905,111 @@ const App = (() => {
     }
 
     // ── Enrichment ──────────────────────────────
+    let enrichWs = null;
+
     function startEnrichment() {
         const btn = document.getElementById('enrich-btn');
-        const status = document.getElementById('enrich-status');
+        const pauseBtn = document.getElementById('enrich-pause-btn');
+        const cancelBtn = document.getElementById('enrich-cancel-btn');
+        const progressEl = document.getElementById('enrich-progress');
+        const statusEl = document.getElementById('enrich-status');
+        const fillEl = document.getElementById('enrich-progress-fill');
+        const delay = parseInt(document.getElementById('enrich-delay').value) || 2;
+        const batchLimit = parseInt(document.getElementById('enrich-batch-limit').value) || 0;
 
-        btn.disabled = true;
-        btn.textContent = 'Enriching...';
-        status.textContent = 'Connecting...';
+        btn.classList.add('hidden');
+        pauseBtn.classList.remove('hidden');
+        pauseBtn.textContent = 'Pause';
+        cancelBtn.classList.remove('hidden');
+        progressEl.classList.remove('hidden');
+        statusEl.textContent = 'Connecting...';
+        fillEl.style.width = '0%';
 
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const enrichWs = new WebSocket(`${proto}//${location.host}/ws/enrich`);
+        enrichWs = new WebSocket(`${proto}//${location.host}/ws/enrich`);
 
         enrichWs.onopen = () => {
-            enrichWs.send(JSON.stringify({}));
+            enrichWs.send(JSON.stringify({ delay, batch_limit: batchLimit }));
         };
 
         enrichWs.onmessage = (event) => {
             const data = JSON.parse(event.data);
-
-            if (data.error) {
-                status.textContent = `Error: ${data.error}`;
-                btn.disabled = false;
-                btn.textContent = 'Enrich with Web Search';
-                return;
-            }
-
             const stats = data.stats || {};
-            if (data.done) {
-                status.textContent =
-                    `Done! ${stats.enriched || 0} enriched, ${stats.unknown || 0} unknown, ${stats.errors || 0} errors`;
-                btn.disabled = false;
-                btn.textContent = 'Enrich with Web Search';
-                enrichWs.close();
+            const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
 
-                // Refresh views
-                loadReviewPlugins(1);
-                loadReviewBadge();
-                loadStats();
-                loadFilters();
-            } else {
-                const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
-                status.textContent =
-                    `${data.processed}/${data.total} (${pct}%) — ${data.current || 'searching...'}` +
-                    ` | enriched: ${stats.enriched || 0}`;
+            switch (data.type) {
+                case 'progress':
+                case 'enriched':
+                    fillEl.style.width = `${pct}%`;
+                    statusEl.textContent =
+                        `${data.processed}/${data.total} (${pct}%) — ${data.current || '...'} | enriched: ${stats.enriched || 0}`;
+                    break;
+                case 'error':
+                    statusEl.textContent =
+                        `${data.processed}/${data.total} — Error: ${data.error || data.current} | enriched: ${stats.enriched || 0}, errors: ${stats.errors || 0}`;
+                    break;
+                case 'paused':
+                    pauseBtn.textContent = 'Resume';
+                    statusEl.textContent += ' [PAUSED]';
+                    break;
+                case 'resumed':
+                    pauseBtn.textContent = 'Pause';
+                    break;
+                case 'auto_paused':
+                case 'rate_limited':
+                    pauseBtn.textContent = 'Resume';
+                    statusEl.textContent = `${data.reason || 'Auto-paused'} (${stats.enriched || 0} enriched so far)`;
+                    break;
+                case 'cancelling':
+                    statusEl.textContent = 'Cancelling...';
+                    break;
+                case 'cancelled':
+                case 'done':
+                    fillEl.style.width = '100%';
+                    statusEl.textContent =
+                        `${data.type === 'cancelled' ? 'Cancelled' : 'Done'}! ${stats.enriched || 0} enriched, ${stats.errors || 0} errors`;
+                    _enrichmentDone();
+                    break;
             }
         };
 
         enrichWs.onerror = () => {
-            status.textContent = 'WebSocket error';
-            btn.disabled = false;
-            btn.textContent = 'Enrich with Web Search';
+            statusEl.textContent = 'Connection error';
+            _enrichmentDone();
         };
 
         enrichWs.onclose = () => {
-            btn.disabled = false;
-            btn.textContent = 'Enrich with Web Search';
+            _enrichmentDone();
         };
+    }
+
+    function _enrichmentDone() {
+        const btn = document.getElementById('enrich-btn');
+        const pauseBtn = document.getElementById('enrich-pause-btn');
+        const cancelBtn = document.getElementById('enrich-cancel-btn');
+        btn.classList.remove('hidden');
+        pauseBtn.classList.add('hidden');
+        cancelBtn.classList.add('hidden');
+        enrichWs = null;
+        loadReviewPlugins(1);
+        loadReviewBadge();
+        loadStats();
+        loadFilters();
+    }
+
+    function pauseEnrichment() {
+        if (!enrichWs) return;
+        const pauseBtn = document.getElementById('enrich-pause-btn');
+        if (pauseBtn.textContent === 'Pause') {
+            enrichWs.send(JSON.stringify({ action: 'pause' }));
+        } else {
+            enrichWs.send(JSON.stringify({ action: 'resume' }));
+        }
+    }
+
+    function cancelEnrichment() {
+        if (!enrichWs) return;
+        enrichWs.send(JSON.stringify({ action: 'cancel' }));
     }
 
     // ── Settings ────────────────────────────────
@@ -1209,6 +1258,8 @@ const App = (() => {
         savePlugin,
         triggerScan,
         startEnrichment,
+        pauseEnrichment,
+        cancelEnrichment,
         enrichSingle,
         loadSettings,
         onProviderChange,
