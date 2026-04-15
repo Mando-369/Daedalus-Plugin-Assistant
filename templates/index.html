@@ -286,6 +286,31 @@
                     <button class="btn btn-primary" onclick="App.saveSettings()">Save Settings</button>
                     <span id="save-result" class="settings-status"></span>
                 </div>
+
+                <div class="settings-section">
+                    <h3>Scan Directories</h3>
+                    <p class="settings-hint" style="margin-bottom:8px">
+                        Directories scanned for audio plugins. Standard macOS paths are included by default.
+                    </p>
+                    <div id="scan-dirs-list"></div>
+                    <div class="scan-dir-add">
+                        <input type="text" id="scan-dir-new-path" placeholder="/path/to/plugins">
+                        <select id="scan-dir-new-format">
+                            <option value="AU">AU (.component)</option>
+                            <option value="VST3">VST3 (.vst3)</option>
+                        </select>
+                        <select id="scan-dir-new-scope">
+                            <option value="system">System</option>
+                            <option value="user">User</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="App.addScanDir()">Add</button>
+                    </div>
+                    <div style="margin-top:8px;display:flex;gap:8px">
+                        <button class="btn btn-sm btn-primary" onclick="App.saveScanDirs()">Save Directories</button>
+                        <button class="btn btn-sm" onclick="App.resetScanDirs()">Reset to Defaults</button>
+                        <span id="scan-dirs-result" class="settings-status"></span>
+                    </div>
+                </div>
             </div>
         </div>
 

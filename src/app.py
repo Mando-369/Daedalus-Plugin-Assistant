@@ -28,7 +28,7 @@ from config import (
     BASE_DIR, WEB_HOST, WEB_PORT, WEB_RELOAD, WEB_LOG_LEVEL,
     UI_TITLE, UI_PLUGINS_PER_PAGE,
 )
-from src.models import get_db, init_db
+from src.models import get_db, init_db, get_setting, set_setting
 from src.scanner import scan_plugins
 from src.classifier import classify_all
 from src.embeddings import PluginEmbeddingStore
@@ -637,6 +637,33 @@ async def web_search_api(request: WebSearchRequest):
     return {"results": enriched}
 
 
+# ── Scan Directories API ──────────────────────────
+
+def _get_scan_dirs() -> list[dict]:
+    """Get scan dirs from DB settings, fall back to config defaults."""
+    custom = get_setting("scan_dirs")
+    if custom:
+        try:
+            return json.loads(custom)
+        except Exception:
+            pass
+    from config import PLUGIN_SCAN_DIRS
+    return PLUGIN_SCAN_DIRS
+
+
+@app.get("/api/settings/scan-dirs")
+async def get_scan_dirs():
+    """Get configured scan directories."""
+    return _get_scan_dirs()
+
+
+@app.put("/api/settings/scan-dirs")
+async def update_scan_dirs(dirs: list):
+    """Update scan directories."""
+    set_setting("scan_dirs", json.dumps(dirs))
+    return {"status": "updated"}
+
+
 # ── Scan & Populate API ───────────────────────────
 
 @app.post("/api/scan")
@@ -644,7 +671,7 @@ async def trigger_scan():
     """Scan plugin directories and populate the database."""
     try:
         # 1. Scan
-        raw_plugins = scan_plugins()
+        raw_plugins = scan_plugins(scan_dirs=_get_scan_dirs())
 
         # 2. Classify
         classified = classify_all(raw_plugins)
@@ -939,6 +966,16 @@ async def update_settings(settings: dict):
     """Update LLM settings."""
     from src.models import set_setting
     from src.llm_client import reload_clients
+
+    # Handle scan dirs reset
+    if settings.get("scan_dirs_reset"):
+        conn = get_db()
+        try:
+            conn.execute("DELETE FROM settings WHERE key = 'scan_dirs'")
+            conn.commit()
+        finally:
+            conn.close()
+        return {"status": "updated"}
 
     allowed_keys = {
         "llm_provider", "llm_base_url", "llm_model", "llm_api_key",

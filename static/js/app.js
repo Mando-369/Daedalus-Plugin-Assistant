@@ -44,7 +44,7 @@ const App = (() => {
         if (tab === 'browse') loadPlugins();
         if (tab === 'review') loadReviewPlugins();
         if (tab === 'stats') loadStats();
-        if (tab === 'settings') loadSettings();
+        if (tab === 'settings') { loadSettings(); loadScanDirs(); }
     }
 
     // ── Chat ────────────────────────────────────
@@ -1245,6 +1245,91 @@ const App = (() => {
         }
     }
 
+    // ── Scan Directories ────────────────────────
+    let currentScanDirs = [];
+
+    const FORMAT_EXTENSIONS = { AU: '.component', VST3: '.vst3' };
+
+    async function loadScanDirs() {
+        try {
+            const resp = await fetch('/api/settings/scan-dirs');
+            currentScanDirs = await resp.json();
+            _renderScanDirs();
+        } catch (e) {
+            console.error('Failed to load scan dirs:', e);
+        }
+    }
+
+    function _renderScanDirs() {
+        const list = document.getElementById('scan-dirs-list');
+        if (!currentScanDirs.length) {
+            list.innerHTML = '<p class="settings-hint">No directories configured.</p>';
+            return;
+        }
+        list.innerHTML = currentScanDirs.map((d, i) => `
+            <div class="scan-dir-row">
+                <span class="scan-dir-path">${esc(d.path)}</span>
+                <span class="scan-dir-meta">${d.format} | ${d.scope}</span>
+                <button class="btn-dismiss" onclick="App.removeScanDir(${i})" title="Remove">&times;</button>
+            </div>
+        `).join('');
+    }
+
+    function addScanDir() {
+        const pathEl = document.getElementById('scan-dir-new-path');
+        const formatEl = document.getElementById('scan-dir-new-format');
+        const scopeEl = document.getElementById('scan-dir-new-scope');
+        const path = pathEl.value.trim();
+        if (!path) return;
+
+        const fmt = formatEl.value;
+        currentScanDirs.push({
+            path: path,
+            format: fmt,
+            scope: scopeEl.value,
+            extension: FORMAT_EXTENSIONS[fmt] || '.component',
+        });
+        pathEl.value = '';
+        _renderScanDirs();
+    }
+
+    function removeScanDir(index) {
+        currentScanDirs.splice(index, 1);
+        _renderScanDirs();
+    }
+
+    async function saveScanDirs() {
+        const resultEl = document.getElementById('scan-dirs-result');
+        try {
+            await fetch('/api/settings/scan-dirs', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentScanDirs),
+            });
+            resultEl.textContent = 'Saved';
+            resultEl.style.color = 'var(--success)';
+            setTimeout(() => { resultEl.textContent = ''; }, 3000);
+        } catch (e) {
+            resultEl.textContent = `Error: ${e.message}`;
+            resultEl.style.color = 'var(--error)';
+        }
+    }
+
+    async function resetScanDirs() {
+        try {
+            // Delete the custom setting to fall back to config defaults
+            await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scan_dirs_reset: true }),
+            });
+            await loadScanDirs();
+            document.getElementById('scan-dirs-result').textContent = 'Reset to defaults';
+        } catch (e) {
+            console.error('Failed to reset:', e);
+        }
+    }
+
     // ── Markdown Rendering ───────────────────────
     function renderMarkdown(text) {
         // Escape HTML first
@@ -1328,6 +1413,11 @@ const App = (() => {
         cancelEnrichment,
         enrichSingle,
         loadSettings,
+        loadScanDirs,
+        addScanDir,
+        removeScanDir,
+        saveScanDirs,
+        resetScanDirs,
         onProviderChange,
         toggleAgentSettings,
         testConnection,

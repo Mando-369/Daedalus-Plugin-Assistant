@@ -1019,6 +1019,42 @@ body {
     color: var(--accent);
 }
 
+.scan-dir-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: var(--font-size-sm);
+}
+
+.scan-dir-row:hover {
+    background: var(--bg-tertiary);
+}
+
+.scan-dir-path {
+    flex: 1;
+    font-family: monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scan-dir-meta {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.scan-dir-add {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.scan-dir-add input {
+    flex: 1;
+}
+
 input[type="range"] {
     width: 100%;
     accent-color: var(--accent);

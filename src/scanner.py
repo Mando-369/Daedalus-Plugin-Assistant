@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import PLUGIN_SCAN_DIRS, SCANNER_SKIP_EXTENSIONS, SCANNER_SKIP_PATTERNS, OWN_PLUGIN_BRANDS
+from config import SCANNER_SKIP_EXTENSIONS, SCANNER_SKIP_PATTERNS, OWN_PLUGIN_BRANDS
 
 
 def clean_plugin_name(filename: str, extension: str) -> str:
@@ -216,16 +216,23 @@ def should_skip(filename: str) -> bool:
     return False
 
 
-def scan_plugins() -> list[dict]:
+def scan_plugins(scan_dirs: list[dict] = None) -> list[dict]:
     """
-    Scan all configured directories and return a list of discovered plugins.
+    Scan plugin directories and return a list of discovered plugins.
     Each plugin is a dict with: name, display_name, file_name, format, scope,
-    file_path, is_own_plugin, own_brand.
-    """
-    plugins = []
-    seen = set()  # for deduplication within same format
+    file_path, is_own_plugin, own_brand, developer, plugin_type.
 
-    for scan_dir in PLUGIN_SCAN_DIRS:
+    Args:
+        scan_dirs: List of dir configs. Falls back to config.PLUGIN_SCAN_DIRS if None.
+    """
+    if scan_dirs is None:
+        from config import PLUGIN_SCAN_DIRS
+        scan_dirs = PLUGIN_SCAN_DIRS
+
+    plugins = []
+    seen = set()
+
+    for scan_dir in scan_dirs:
         dir_path = scan_dir["path"]
         fmt = scan_dir["format"]
         scope = scan_dir["scope"]
