@@ -882,17 +882,6 @@ body {
 
 .hidden { display: none !important; }
 
-.review-toolbar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.review-toolbar input {
-    flex: 1;
-    max-width: 250px;
-}
-
 /* ── Enrichment Queue ─────────────────────── */
 .btn-dismiss {
     background: none;
