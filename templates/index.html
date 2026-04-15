@@ -134,12 +134,14 @@
                             <label for="set-llm-provider">Provider</label>
                             <select id="set-llm-provider" onchange="App.onProviderChange('llm')">
                                 <option value="ollama">Local Ollama</option>
+                                <option value="euria">Euria / Infomaniak (free, Swiss, GDPR)</option>
                                 <option value="openrouter">OpenRouter (free models, global)</option>
                                 <option value="gemini">Google Gemini (not free in EU)</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="deepseek">DeepSeek</option>
                                 <option value="custom">Custom (OpenAI-compatible)</option>
                             </select>
+                            <small id="llm-provider-hint" class="settings-hint"></small>
                         </div>
                         <div class="form-group">
                             <label for="set-llm-model">Model</label>
@@ -177,6 +179,7 @@
                                 <label for="set-agent-provider">Provider</label>
                                 <select id="set-agent-provider">
                                     <option value="ollama">Local Ollama</option>
+                                    <option value="euria">Euria / Infomaniak</option>
                                     <option value="openrouter">OpenRouter (free)</option>
                                     <option value="gemini">Google Gemini</option>
                                     <option value="openai">OpenAI</option>

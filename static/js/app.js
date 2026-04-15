@@ -966,6 +966,7 @@ const App = (() => {
     // ── Settings ────────────────────────────────
     const PROVIDER_URLS = {
         ollama: 'http://127.0.0.1:11434',
+        euria: '',
         openrouter: 'https://openrouter.ai/api/v1',
         gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
         openai: 'https://api.openai.com/v1',
@@ -974,10 +975,21 @@ const App = (() => {
 
     const PROVIDER_MODELS = {
         ollama: 'gemma4:26b',
+        euria: 'mixtral',
         openrouter: 'openrouter/free',
         gemini: 'gemini-2.5-flash',
         openai: 'gpt-4o-mini',
         deepseek: 'deepseek-chat',
+    };
+
+    const PROVIDER_HINTS = {
+        ollama: 'Runs locally on your machine. No API key needed.',
+        euria: 'Free, Swiss-hosted, GDPR compliant. Get your API key and product ID at <a href="https://www.infomaniak.com/en/hosting/ai-services" target="_blank">infomaniak.com/ai-services</a>. Set Base URL to: https://api.infomaniak.com/1/ai/YOUR_PRODUCT_ID/openai',
+        openrouter: 'Free models available globally, no credit card needed. Get key at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>',
+        gemini: 'Free tier NOT available in EU/EEA/UK/Switzerland. Get key at <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a>',
+        openai: 'Pay-per-use. Get key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
+        deepseek: 'Very affordable. Get key at <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a>',
+        custom: 'Any OpenAI-compatible endpoint. Enter the base URL and API key.',
     };
 
     async function loadSettings() {
@@ -1027,7 +1039,7 @@ const App = (() => {
         const keyEl = document.getElementById(`${prefix}-key-group`);
 
         // Auto-fill URL and model
-        if (PROVIDER_URLS[provider]) {
+        if (PROVIDER_URLS[provider] !== undefined) {
             document.getElementById(`set-${prefix}-url`).value = PROVIDER_URLS[provider];
         }
         if (PROVIDER_MODELS[provider]) {
@@ -1041,6 +1053,14 @@ const App = (() => {
             } else {
                 keyEl.classList.remove('hidden');
             }
+        }
+
+        // Show provider hint
+        const hintEl = document.getElementById(`${prefix}-provider-hint`);
+        if (hintEl && PROVIDER_HINTS[provider]) {
+            hintEl.innerHTML = PROVIDER_HINTS[provider];
+        } else if (hintEl) {
+            hintEl.innerHTML = '';
         }
     }
 

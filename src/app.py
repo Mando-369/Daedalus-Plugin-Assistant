@@ -930,9 +930,9 @@ async def system_info():
     elif ram_gb >= 32:
         recommendation = "Gemma 4 26B locally (good fit for 32GB)"
     elif ram_gb >= 16:
-        recommendation = "Qwen 3.5 14B Q4 locally (~9GB) or OpenRouter free tier online"
+        recommendation = "Qwen 3.5 14B Q4 locally (~9GB) or Euria online (free, Swiss, GDPR)"
     else:
-        recommendation = "OpenRouter free tier online (29 free models, no credit card, works globally)"
+        recommendation = "Euria (free, Swiss-hosted, GDPR) or OpenRouter (free, global)"
 
     return {
         "ram_gb": ram_gb,

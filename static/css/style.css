@@ -911,6 +911,18 @@ body {
     font-size: var(--font-size-sm);
 }
 
+.settings-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.settings-hint a {
+    color: var(--accent);
+}
+
 input[type="range"] {
     width: 100%;
     accent-color: var(--accent);

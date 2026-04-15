@@ -17,6 +17,7 @@ import httpx
 # Known provider base URLs
 PROVIDER_URLS = {
     "ollama": "http://127.0.0.1:11434",
+    "euria": "",  # requires product_id: https://api.infomaniak.com/1/ai/{product_id}/openai
     "openrouter": "https://openrouter.ai/api/v1",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
     "openai": "https://api.openai.com/v1",
@@ -26,6 +27,7 @@ PROVIDER_URLS = {
 # Default models per provider
 PROVIDER_DEFAULTS = {
     "ollama": "gemma4:26b",
+    "euria": "mixtral",          # Infomaniak/Swiss sovereign AI, free, GDPR, OpenAI-compatible
     "openrouter": "openrouter/free",  # auto-picks best free model, works globally
     "gemini": "gemini-2.5-flash",     # NOTE: free tier NOT available in EU/EEA/UK
     "openai": "gpt-4o-mini",
