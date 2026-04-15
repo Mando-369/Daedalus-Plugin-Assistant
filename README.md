@@ -122,18 +122,33 @@ Conversations are saved automatically and accessible from the sidebar. Search pa
 - Confidence dot turns green automatically when key fields are filled (via enrichment or manual edit)
 - Check "My own plugin" for plugins you developed
 
+### LLM Settings
+
+Click the **Settings** tab to configure your LLM backend. A provider comparison table helps you choose:
+
+| Provider | Cost | Privacy | EU/GDPR | Best For |
+|----------|------|---------|---------|----------|
+| **Local Ollama** | Free | 100% local | N/A | Best quality + privacy (16GB+ RAM) |
+| **Euria / Infomaniak** | Free | Swiss-hosted | GDPR compliant | EU users, privacy-focused, no GPU needed |
+| **OpenRouter** | Free tier | Cloud | Global | No GPU, no credit card, works everywhere |
+| **Google Gemini** | Free tier | Cloud (Google) | Not free in EU | Large context, outside EU only |
+| **OpenAI** | Pay-per-use | Cloud | Global | Most reliable, highest quality |
+| **DeepSeek** | Very cheap | Cloud (China) | Global | Budget option, strong reasoning |
+
+Default is **Local Ollama**. You can set separate models for chat and enrichment agents (e.g., fast local model for agents, powerful cloud model for chat). Test your connection from the Settings tab before saving.
+
 ## Configuration
 
-Key settings in `config.py`:
+Key settings in `config.py` (runtime settings are managed via the Settings tab in the UI):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `OLLAMA_MODEL` | `gemma4:26b` | LLM model for chat and enrichment agents |
+| `OLLAMA_MODEL` | `gemma4:26b` | Default local LLM model |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Ollama API endpoint |
 | `SEARXNG_URL` | `http://127.0.0.1:8888` | SearXNG instance URL |
 | `WEB_PORT` | `8777` | Web server port |
 | `PLUGIN_SCAN_DIRS` | Standard macOS paths | Directories to scan for AU, VST3 plugins |
-| `EMBEDDING_MODEL` | `nomic-embed-text` | Model for semantic search embeddings |
+| `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model (always local via Ollama) |
 | `RAG_MAX_CONTEXT_PLUGINS` | `20` | Max plugins included in LLM context |
 | `OWN_PLUGIN_BRANDS` | `{}` | Your own plugin brand names for detection |
 
