@@ -911,6 +911,32 @@ body {
     font-size: var(--font-size-sm);
 }
 
+.provider-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+    margin-top: 10px;
+}
+
+.provider-table th,
+.provider-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.provider-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.provider-table tr:hover td {
+    background: var(--bg-tertiary);
+}
+
 .settings-hint {
     display: block;
     margin-top: 4px;
