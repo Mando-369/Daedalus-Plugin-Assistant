@@ -5,6 +5,7 @@ A local macOS application that manages, classifies, and provides intelligent sea
 ![Chat](docs/screenshots/chat.png)
 ![Browse](docs/screenshots/browse.png)
 ![Edit & Enrich](docs/screenshots/edit.png)
+![Stats](docs/screenshots/stats.png)
 ![Settings](docs/screenshots/settings.png)
 
 ## Features
