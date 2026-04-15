@@ -110,18 +110,18 @@ class EnrichmentOrchestrator:
         # Merge results (product agent wins for factual fields)
         merged = {}
         for field in _ALL_FIELDS:
-            # Product agent is authoritative for factual fields
             product_val = product_result.get(field)
             sonic_val = sonic_result.get(field)
 
             if field in ("character", "specialty", "best_used_for",
                         "signal_chain_position", "tags",
                         "hidden_tips", "not_ideal_for"):
-                # Sonic agent is authoritative for subjective fields
                 merged[field] = sonic_val or product_val
             else:
-                # Product agent is authoritative for factual fields
                 merged[field] = product_val or sonic_val
+
+        # Validation: check if merged data is internally consistent
+        merged = self._validate_result(plugin["name"], merged, on_step)
 
         # Apply to DB (non-destructive)
         applied = self._apply_to_db(plugin["name"], merged)
@@ -130,6 +130,92 @@ class EnrichmentOrchestrator:
             on_step("done", "complete", {"applied": applied, "result": merged})
 
         return merged
+
+    def _validate_result(self, plugin_name: str, data: dict, on_step=None) -> dict:
+        """Validate enrichment results for internal consistency.
+
+        Uses a quick LLM call to check if the description, specialty, and
+        best_used_for actually match the category. Nullifies fields that
+        describe a different product.
+        """
+        category = data.get("category")
+        description = data.get("description") or ""
+        specialty = data.get("specialty") or ""
+        best_used_for = data.get("best_used_for") or ""
+
+        # Skip if no category or no subjective fields to check
+        if not category or not (description + specialty + best_used_for).strip():
+            return data
+
+        from src.llm_client import get_agent_client
+        client = get_agent_client()
+
+        prompt = f"""You are a quality checker for audio plugin metadata.
+
+Plugin: {plugin_name}
+Category: {category}
+
+Check if these fields actually describe a {category} plugin:
+- Description: {description}
+- Specialty: {specialty}
+- Best used for: {best_used_for}
+
+If any field clearly describes a DIFFERENT type of product (wrong plugin,
+different category, unrelated technology), return a JSON object listing
+the bad fields with null values. If everything is consistent, return
+an empty JSON object {{}}.
+
+Example: if category is "Transient Shaper" but specialty mentions
+"Ambisonics" or "spatial audio", that's a mismatch — return
+{{"specialty": null, "best_used_for": null}}.
+
+Return ONLY the JSON object."""
+
+        try:
+            result = client.chat(
+                [{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+            content = result.get("message", {}).get("content", "")
+
+            # Parse the validation result
+            import json
+            # Try to extract JSON
+            content = content.strip()
+            if content.startswith("```"):
+                for block in content.split("```"):
+                    block = block.strip()
+                    if block.startswith("json"):
+                        block = block[4:].strip()
+                    try:
+                        fixes = json.loads(block)
+                        break
+                    except json.JSONDecodeError:
+                        continue
+                else:
+                    fixes = {}
+            else:
+                start = content.find("{")
+                end = content.rfind("}")
+                if start != -1 and end > start:
+                    fixes = json.loads(content[start:end + 1])
+                else:
+                    fixes = {}
+
+            if fixes:
+                if on_step:
+                    on_step("validation", "fixed", {
+                        "plugin": plugin_name,
+                        "nullified": list(fixes.keys()),
+                    })
+                for field, val in fixes.items():
+                    if field in data and val is None:
+                        data[field] = None
+
+        except Exception:
+            pass  # Validation failure is non-critical, keep original data
+
+        return data
 
     def enrich_batch(self, plugin_ids: list[int] = None, limit: int = None,
                      state: dict = None):
