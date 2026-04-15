@@ -3,11 +3,21 @@ Daedalus Plugin Assistant - Central Configuration
 All adjustable parameters live here. Nothing hardcoded elsewhere.
 """
 
-# Kill ChromaDB telemetry before anything imports it
+# Kill ChromaDB telemetry -- env vars don't work due to PostHog v7 API change
+# (https://github.com/chroma-core/chroma/issues/4966)
+# Monkey-patch PostHog so it never sends anything.
 import os as _os
 _os.environ["ANONYMIZED_TELEMETRY"] = "False"
-_os.environ["CHROMA_TELEMETRY"] = "False"
-_os.environ["POSTHOG_DISABLED"] = "true"
+try:
+    import posthog as _posthog
+    _posthog.capture = lambda *args, **kwargs: None
+    _posthog.Posthog = type("Posthog", (), {
+        "__init__": lambda self, *a, **kw: None,
+        "capture": lambda self, *a, **kw: None,
+        "shutdown": lambda self: None,
+    })
+except ImportError:
+    pass
 
 import os
 import platform
