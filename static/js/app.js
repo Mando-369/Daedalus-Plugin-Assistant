@@ -42,7 +42,7 @@ const App = (() => {
         document.getElementById(`tab-${tab}`).classList.add('active');
 
         if (tab === 'browse') loadPlugins();
-        if (tab === 'review') loadReviewPlugins();
+        if (tab === 'review') { loadReviewPlugins(); _populateReviewDevFilter(); }
         if (tab === 'stats') loadStats();
         if (tab === 'settings') { loadSettings(); loadScanDirs(); }
     }
@@ -364,39 +364,39 @@ const App = (() => {
             const data = await resp.json();
             renderPluginGrid('review-list', data.plugins);
             renderPagination('review-pagination', data.page, data.pages, loadReviewPlugins);
-
-            // Populate developer filter from review plugins
-            _populateReviewDevFilter(data.plugins);
         } catch (e) {
             document.getElementById('review-list').innerHTML =
                 '<p class="empty-state">Failed to load review queue.</p>';
         }
     }
 
-    function _populateReviewDevFilter(plugins) {
+    async function _populateReviewDevFilter() {
         const select = document.getElementById('review-filter-developer');
         if (!select) return;
         const current = select.value;
-        // Only populate once (check if has options beyond default)
-        if (select.options.length > 1) return;
 
-        // Fetch all review plugin developers
-        fetch('/api/plugins?needs_review=true&per_page=9999')
-            .then(r => r.json())
-            .then(data => {
-                const devs = {};
-                (data.plugins || []).forEach(p => {
-                    if (p.developer) devs[p.developer] = (devs[p.developer] || 0) + 1;
-                });
-                const sorted = Object.entries(devs).sort((a, b) => a[0].localeCompare(b[0]));
-                sorted.forEach(([dev, count]) => {
+        try {
+            const resp = await fetch('/api/plugins?needs_review=true&per_page=9999');
+            const data = await resp.json();
+            const devs = {};
+            (data.plugins || []).forEach(p => {
+                if (p.developer) devs[p.developer] = (devs[p.developer] || 0) + 1;
+            });
+
+            // Reset and rebuild
+            select.innerHTML = '<option value="">All Developers</option>';
+            Object.entries(devs)
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .forEach(([dev, count]) => {
                     const opt = document.createElement('option');
                     opt.value = dev;
                     opt.textContent = `${dev} (${count})`;
                     select.appendChild(opt);
                 });
-                select.value = current;
-            });
+            select.value = current;
+        } catch (e) {
+            console.error('Failed to load review developers:', e);
+        }
     }
 
     function debouncedReview() {
