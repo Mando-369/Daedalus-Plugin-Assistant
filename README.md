@@ -167,7 +167,7 @@ Key settings in `config.py` (runtime settings are managed via the Settings tab i
                                   |
                                   v
                            SQLite Database
-                       (1599 plugins + metadata)
+                        (your local plugin data)
                           /              \
                          v                v
               Enrichment Agents      RAG Chat Pipeline
