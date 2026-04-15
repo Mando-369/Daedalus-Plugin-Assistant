@@ -3,6 +3,12 @@ Daedalus Plugin Assistant - Central Configuration
 All adjustable parameters live here. Nothing hardcoded elsewhere.
 """
 
+# Kill ChromaDB telemetry before anything imports it
+import os as _os
+_os.environ["ANONYMIZED_TELEMETRY"] = "False"
+_os.environ["CHROMA_TELEMETRY"] = "False"
+_os.environ["POSTHOG_DISABLED"] = "true"
+
 import os
 import platform
 import subprocess
