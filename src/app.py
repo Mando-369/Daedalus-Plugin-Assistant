@@ -545,7 +545,10 @@ async def websocket_chat(websocket: WebSocket):
                 })
 
                 plugins = await asyncio.to_thread(rag.hybrid_search, user_query)
-                context = rag.build_context(plugins)
+                user_history = await asyncio.to_thread(
+                    rag.search_user_history, user_query, conv_id,
+                )
+                context = rag.build_context(plugins, user_history)
 
                 # Append web search context if provided
                 if web_context:

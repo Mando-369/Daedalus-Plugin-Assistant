@@ -194,6 +194,10 @@ When answering:
 - Reference the signal chain position when relevant
 - If you're unsure about a specific plugin, say so
 
+Previous user queries may be included for preference context. Use them to understand the
+user's workflow and taste, but ALWAYS verify against the current plugin database. New plugins
+may have been added since those conversations. Never limit your answer to what was discussed before.
+
 The user is an experienced audio engineer and plugin developer. Be technical and precise."""
 
 # ──────────────────────────────────────────────

@@ -240,6 +240,26 @@ def init_db():
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
 
+    -- FTS5 for conversation message search
+    DROP TRIGGER IF EXISTS messages_fts_ai;
+    DROP TRIGGER IF EXISTS messages_fts_ad;
+    DROP TABLE IF EXISTS messages_fts;
+
+    CREATE VIRTUAL TABLE messages_fts USING fts5(
+        content,
+        content='messages',
+        content_rowid='id'
+    );
+
+    CREATE TRIGGER messages_fts_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+    END;
+
+    CREATE TRIGGER messages_fts_ad AFTER DELETE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, content)
+        VALUES ('delete', old.id, old.content);
+    END;
+
     -- Application settings (key-value store)
     CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
@@ -258,7 +278,7 @@ def init_db():
         if col not in existing_cols:
             cur.execute(f"ALTER TABLE plugins ADD COLUMN {col} {typedef}")
 
-    # Rebuild FTS index from existing data
+    # Rebuild FTS indexes from existing data
     cur.execute("""
         INSERT INTO plugins_fts(rowid, name, display_name, developer, category, subcategory,
             description, specialty, best_used_for, character, tags, notes,
@@ -267,6 +287,11 @@ def init_db():
             description, specialty, best_used_for, character, tags, notes,
             hidden_tips, not_ideal_for
         FROM plugins
+    """)
+
+    cur.execute("""
+        INSERT INTO messages_fts(rowid, content)
+        SELECT id, content FROM messages
     """)
 
     conn.commit()

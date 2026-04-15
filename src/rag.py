@@ -24,6 +24,28 @@ from src.models import get_db
 from src.embeddings import PluginEmbeddingStore
 
 
+_STOP_WORDS = {
+    "a", "an", "the", "is", "are", "was", "were", "be", "been",
+    "do", "does", "did", "have", "has", "had", "i", "me", "my",
+    "we", "our", "you", "your", "it", "its", "they", "them",
+    "which", "what", "who", "how", "when", "where", "why",
+    "can", "could", "would", "should", "will", "shall",
+    "of", "in", "on", "at", "to", "for", "with", "from", "by",
+    "and", "or", "not", "no", "but", "if", "so", "that", "this",
+    "all", "any", "some", "many", "much", "most", "very",
+    "just", "also", "about", "like", "need", "want", "find",
+    "show", "list", "get", "give", "tell", "something",
+}
+
+
+def _build_fts_query(query: str) -> str:
+    """Build FTS5 query from natural language, filtering stop words."""
+    fts_query = query.replace('"', '""')
+    terms = [t for t in fts_query.split()
+             if t.strip() and t.lower() not in _STOP_WORDS and len(t) > 1]
+    return " OR ".join(f'"{t}"*' for t in terms)
+
+
 class RAGPipeline:
     """Orchestrates retrieval and generation for plugin queries."""
 
@@ -39,24 +61,7 @@ class RAGPipeline:
         """
         conn = get_db()
         try:
-            # Build FTS query - escape special chars, filter stop words
-            fts_query = query.replace('"', '""')
-            stop_words = {
-                "a", "an", "the", "is", "are", "was", "were", "be", "been",
-                "do", "does", "did", "have", "has", "had", "i", "me", "my",
-                "we", "our", "you", "your", "it", "its", "they", "them",
-                "which", "what", "who", "how", "when", "where", "why",
-                "can", "could", "would", "should", "will", "shall",
-                "of", "in", "on", "at", "to", "for", "with", "from", "by",
-                "and", "or", "not", "no", "but", "if", "so", "that", "this",
-                "all", "any", "some", "many", "much", "most", "very",
-                "just", "also", "about", "like", "need", "want", "find",
-                "show", "list", "get", "give", "tell", "something",
-            }
-            terms = [t for t in fts_query.split()
-                     if t.strip() and t.lower() not in stop_words and len(t) > 1]
-            # Use prefix matching for each term
-            fts_terms = " OR ".join(f'"{t}"*' for t in terms)
+            fts_terms = _build_fts_query(query)
 
             if not fts_terms:
                 return []
@@ -207,7 +212,47 @@ class RAGPipeline:
 
     # ── Context Building ───────────────────────────────
 
-    def build_context(self, plugins: list[dict]) -> str:
+    # ── User History Search ─────────────────────────
+
+    def search_user_history(self, query: str, exclude_conv_id: int = None,
+                            limit: int = 3) -> list[dict]:
+        """Search past USER messages for preferences and context.
+
+        Only searches user messages (not LLM answers) to avoid amplifying
+        mistakes. Excludes the current conversation.
+        """
+        fts_terms = _build_fts_query(query)
+        if not fts_terms:
+            return []
+
+        conn = get_db()
+        try:
+            params = [fts_terms]
+            sql = """
+                SELECT m.content, m.created_at, c.title
+                FROM messages m
+                JOIN messages_fts ON m.id = messages_fts.rowid
+                JOIN conversations c ON c.id = m.conversation_id
+                WHERE messages_fts MATCH ?
+                  AND m.role = 'user'
+            """
+            if exclude_conv_id:
+                sql += " AND m.conversation_id != ?"
+                params.append(exclude_conv_id)
+
+            sql += " ORDER BY messages_fts.rank LIMIT ?"
+            params.append(limit)
+
+            rows = conn.execute(sql, params).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            return []
+        finally:
+            conn.close()
+
+    # ── Context Building ───────────────────────────────
+
+    def build_context(self, plugins: list[dict], user_history: list[dict] = None) -> str:
         """Format plugin data into a text context for the LLM."""
         if not plugins:
             return "No relevant plugins found in the database."
@@ -250,7 +295,14 @@ class RAGPipeline:
             entries.append("\n".join(lines))
 
         plugin_context = "\n\n".join(entries)
-        return RAG_CONTEXT_TEMPLATE.format(plugin_context=plugin_context)
+        result = RAG_CONTEXT_TEMPLATE.format(plugin_context=plugin_context)
+
+        if user_history:
+            result += "\n\nPrevious user queries (for preference context only — always verify against current plugin data):\n"
+            for h in user_history:
+                result += f"- \"{h['content'][:200]}\"\n"
+
+        return result
 
     # ── LLM Generation ─────────────────────────────────
 
