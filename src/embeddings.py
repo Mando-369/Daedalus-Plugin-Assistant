@@ -35,18 +35,10 @@ class PluginEmbeddingStore:
         )
 
     def _embed_via_ollama(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings from Ollama's embedding model."""
-        with httpx.Client(timeout=120) as client:
-            resp = client.post(
-                f"{OLLAMA_BASE_URL}/api/embed",
-                json={
-                    "model": EMBEDDING_MODEL,
-                    "input": texts,
-                    "keep_alive": OLLAMA_KEEP_ALIVE,
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["embeddings"]
+        """Get embeddings from Ollama's embedding model (always local)."""
+        from src.llm_client import get_chat_client
+        client = get_chat_client()
+        return client.embed(texts, model=EMBEDDING_MODEL, ollama_url=OLLAMA_BASE_URL)
 
     def _build_document(self, plugin: dict) -> str:
         """Build a rich text document from plugin metadata for embedding."""

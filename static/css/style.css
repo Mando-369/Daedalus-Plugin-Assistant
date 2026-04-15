@@ -869,6 +869,53 @@ body {
 
 .hidden { display: none !important; }
 
+/* ── Settings Tab ─────────────────────────── */
+.settings-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: var(--gap);
+}
+
+.settings-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--gap-lg);
+    margin-bottom: var(--gap);
+}
+
+.settings-section h3 {
+    margin: 0 0 var(--gap) 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+}
+
+.settings-info p {
+    margin: 4px 0;
+    font-size: var(--font-size-sm);
+}
+
+.settings-recommendation {
+    color: var(--accent);
+    font-style: italic;
+}
+
+.settings-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    margin-top: var(--gap);
+}
+
+.settings-status {
+    font-size: var(--font-size-sm);
+}
+
+input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+}
+
 .enriched-field {
     outline: 2px solid var(--accent);
     transition: outline 0.3s ease;

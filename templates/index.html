@@ -28,6 +28,7 @@
                 Review <span id="review-badge" class="badge hidden">0</span>
             </button>
             <button class="tab-btn" data-tab="stats" onclick="App.switchTab('stats')">Stats</button>
+            <button class="tab-btn" data-tab="settings" onclick="App.switchTab('settings')">Settings</button>
         </nav>
 
         <!-- ════════════════ CHAT TAB ════════════════ -->
@@ -115,6 +116,84 @@
         <div id="tab-stats" class="tab-content">
             <div class="stats-grid" id="stats-container">
                 <p class="loading-text">Loading statistics...</p>
+            </div>
+        </div>
+
+        <!-- ════════════════ SETTINGS TAB ════════════════ -->
+        <div id="tab-settings" class="tab-content">
+            <div class="settings-container">
+                <div id="system-info" class="settings-section">
+                    <h3>System</h3>
+                    <div id="system-info-content" class="settings-info"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Chat LLM</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="set-llm-provider">Provider</label>
+                            <select id="set-llm-provider" onchange="App.onProviderChange('llm')">
+                                <option value="ollama">Local Ollama</option>
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="custom">Custom (OpenAI-compatible)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="set-llm-model">Model</label>
+                            <input type="text" id="set-llm-model" placeholder="e.g. gemma4:26b">
+                        </div>
+                        <div class="form-group" id="llm-url-group">
+                            <label for="set-llm-url">Base URL</label>
+                            <input type="text" id="set-llm-url" placeholder="http://127.0.0.1:11434">
+                        </div>
+                        <div class="form-group hidden" id="llm-key-group">
+                            <label for="set-llm-key">API Key</label>
+                            <input type="password" id="set-llm-key" placeholder="Enter API key">
+                        </div>
+                        <div class="form-group">
+                            <label for="set-llm-temp">Temperature</label>
+                            <input type="range" id="set-llm-temp" min="0" max="1" step="0.1" value="0.3">
+                            <span id="set-llm-temp-val">0.3</span>
+                        </div>
+                    </div>
+                    <div class="settings-actions">
+                        <button class="btn btn-sm" onclick="App.testConnection()">Test Connection</button>
+                        <span id="test-result" class="settings-status"></span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Agent LLM</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="set-agent-same" checked onchange="App.toggleAgentSettings()">
+                        Use same as Chat
+                    </label>
+                    <div id="agent-settings" class="hidden">
+                        <div class="form-grid" style="margin-top: 8px;">
+                            <div class="form-group">
+                                <label for="set-agent-provider">Provider</label>
+                                <select id="set-agent-provider">
+                                    <option value="ollama">Local Ollama</option>
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="deepseek">DeepSeek</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="set-agent-model">Model</label>
+                                <input type="text" id="set-agent-model" placeholder="e.g. gemma4:26b">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <button class="btn btn-primary" onclick="App.saveSettings()">Save Settings</button>
+                    <span id="save-result" class="settings-status"></span>
+                </div>
             </div>
         </div>
 

@@ -15,12 +15,11 @@ import json
 import httpx
 
 from config import (
-    OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT,
-    OLLAMA_TEMPERATURE, OLLAMA_TOP_P, OLLAMA_NUM_PREDICT,
-    OLLAMA_KEEP_ALIVE, OLLAMA_CONTEXT_LENGTH,
     LLM_SYSTEM_PROMPT, RAG_MAX_CONTEXT_PLUGINS,
     RAG_CONTEXT_TEMPLATE, SEMANTIC_SEARCH_TOP_K, SQL_SEARCH_LIMIT,
+    OLLAMA_TEMPERATURE, OLLAMA_TOP_P,
 )
+from src.llm_client import get_chat_client
 from src.models import get_db
 from src.embeddings import PluginEmbeddingStore
 
@@ -255,137 +254,35 @@ class RAGPipeline:
 
     # ── LLM Generation ─────────────────────────────────
 
-    def generate(self, user_query: str, context: str, chat_history: list = None) -> str:
-        """
-        Send the query + context to Ollama and return the response.
-        Supports streaming internally but returns the full response.
-        """
+    def _build_messages(self, user_query: str, context: str, chat_history: list = None) -> list:
+        """Build the messages list for LLM generation."""
         messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
-
-        # Add chat history for multi-turn conversations
         if chat_history:
-            for msg in chat_history[-6:]:  # keep last 6 messages for context
+            for msg in chat_history[-6:]:
                 messages.append(msg)
-
-        # Build the user message with context
         full_prompt = f"{context}\n\nUser question: {user_query}"
         messages.append({"role": "user", "content": full_prompt})
+        return messages
 
-        with httpx.Client(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
-            with client.stream(
-                "POST",
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": OLLAMA_TEMPERATURE,
-                        "top_p": OLLAMA_TOP_P,
-                        "num_predict": OLLAMA_NUM_PREDICT,
-                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
-                    },
-                    "keep_alive": OLLAMA_KEEP_ALIVE,
-                },
-            ) as response:
-                response.raise_for_status()
-                content_parts = []
-                for line in response.iter_lines():
-                    if line:
-                        chunk = json.loads(line)
-                        content = chunk.get("message", {}).get("content", "")
-                        if content:
-                            content_parts.append(content)
-                        if chunk.get("done"):
-                            break
-                return "".join(content_parts) or "No response generated."
+    def generate(self, user_query: str, context: str, chat_history: list = None) -> str:
+        """Send the query + context to LLM and return the full response."""
+        messages = self._build_messages(user_query, context, chat_history)
+        client = get_chat_client()
+        result = client.chat(messages, stream=True, top_p=OLLAMA_TOP_P)
+        return result.get("message", {}).get("content", "") or "No response generated."
 
     def generate_stream(self, user_query: str, context: str, chat_history: list = None):
-        """
-        Stream the LLM response token by token.
-        Yields content chunks as they arrive.
-        """
-        messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
-
-        if chat_history:
-            for msg in chat_history[-6:]:
-                messages.append(msg)
-
-        full_prompt = f"{context}\n\nUser question: {user_query}"
-        messages.append({"role": "user", "content": full_prompt})
-
-        with httpx.Client(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
-            with client.stream(
-                "POST",
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": OLLAMA_TEMPERATURE,
-                        "top_p": OLLAMA_TOP_P,
-                        "num_predict": OLLAMA_NUM_PREDICT,
-                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
-                    },
-                    "keep_alive": OLLAMA_KEEP_ALIVE,
-                },
-            ) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if line:
-                        chunk = json.loads(line)
-                        msg = chunk.get("message", {})
-                        thinking = msg.get("thinking", "")
-                        content = msg.get("content", "")
-                        if thinking:
-                            yield ("thinking", thinking)
-                        if content:
-                            yield ("content", content)
-                        if chunk.get("done"):
-                            break
+        """Stream the LLM response. Yields (type, content) tuples."""
+        messages = self._build_messages(user_query, context, chat_history)
+        client = get_chat_client()
+        yield from client.chat_stream(messages, top_p=OLLAMA_TOP_P)
 
     async def async_generate_stream(self, user_query: str, context: str, chat_history: list = None):
-        """Async streaming LLM response for use in async WebSocket handlers."""
-        messages = [{"role": "system", "content": LLM_SYSTEM_PROMPT}]
-
-        if chat_history:
-            for msg in chat_history[-6:]:
-                messages.append(msg)
-
-        full_prompt = f"{context}\n\nUser question: {user_query}"
-        messages.append({"role": "user", "content": full_prompt})
-
-        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)) as client:
-            async with client.stream(
-                "POST",
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": True,
-                    "options": {
-                        "temperature": OLLAMA_TEMPERATURE,
-                        "top_p": OLLAMA_TOP_P,
-                        "num_predict": OLLAMA_NUM_PREDICT,
-                        "num_ctx": OLLAMA_CONTEXT_LENGTH,
-                    },
-                    "keep_alive": OLLAMA_KEEP_ALIVE,
-                },
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line:
-                        chunk = json.loads(line)
-                        msg = chunk.get("message", {})
-                        thinking = msg.get("thinking", "")
-                        content = msg.get("content", "")
-                        if thinking:
-                            yield ("thinking", thinking)
-                        if content:
-                            yield ("content", content)
-                        if chunk.get("done"):
-                            break
+        """Async streaming LLM response for WebSocket handlers."""
+        messages = self._build_messages(user_query, context, chat_history)
+        client = get_chat_client()
+        async for item in client.achat_stream(messages, top_p=OLLAMA_TOP_P):
+            yield item
 
     # ── Main Query Entry Point ─────────────────────────
 

@@ -862,6 +862,86 @@ async def enrich_plugin(plugin_id: int, request: EnrichRequest = EnrichRequest()
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Settings API ──────────────────────────────────
+
+@app.get("/api/settings")
+async def get_settings():
+    """Get all LLM settings."""
+    from src.models import get_all_settings
+    settings = get_all_settings()
+    # Mask API key for display
+    if settings.get("llm_api_key"):
+        key = settings["llm_api_key"]
+        settings["llm_api_key_masked"] = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else "****"
+    return settings
+
+
+@app.put("/api/settings")
+async def update_settings(settings: dict):
+    """Update LLM settings."""
+    from src.models import set_setting
+    from src.llm_client import reload_clients
+
+    allowed_keys = {
+        "llm_provider", "llm_base_url", "llm_model", "llm_api_key",
+        "llm_temperature",
+        "agent_provider", "agent_base_url", "agent_model", "agent_api_key",
+    }
+    for key, value in settings.items():
+        if key in allowed_keys:
+            set_setting(key, str(value))
+
+    # Reload LLM clients with new settings
+    reload_clients()
+
+    return {"status": "updated"}
+
+
+@app.post("/api/settings/test")
+async def test_llm_connection(settings: dict = None):
+    """Test LLM connection with current or provided settings."""
+    from src.llm_client import LLMClient
+    if settings and settings.get("provider"):
+        client = LLMClient(
+            provider=settings.get("provider", "ollama"),
+            base_url=settings.get("base_url"),
+            model=settings.get("model"),
+            api_key=settings.get("api_key"),
+        )
+    else:
+        from src.llm_client import get_chat_client
+        client = get_chat_client()
+
+    result = await asyncio.to_thread(client.test_connection)
+    return result
+
+
+@app.get("/api/settings/system-info")
+async def system_info():
+    """Get system info for LLM recommendations."""
+    from config import _system_ram
+    import platform
+
+    ram_gb = _system_ram
+    chip = platform.processor() or platform.machine()
+
+    if ram_gb >= 64:
+        recommendation = "Gemma 4 26B or Qwen 3.5 27B locally (plenty of RAM)"
+    elif ram_gb >= 32:
+        recommendation = "Gemma 4 26B locally (good fit for 32GB)"
+    elif ram_gb >= 16:
+        recommendation = "Qwen 3.5 14B Q4 locally (~9GB) or Gemini Flash online (free)"
+    else:
+        recommendation = "Gemini Flash online (free tier, 1000 req/day)"
+
+    return {
+        "ram_gb": ram_gb,
+        "chip": chip,
+        "platform": platform.system(),
+        "recommendation": recommendation,
+    }
+
+
 # ── Startup ────────────────────────────────────────
 
 @app.on_event("startup")

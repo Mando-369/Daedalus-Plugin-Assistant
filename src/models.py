@@ -239,6 +239,12 @@ def init_db():
     );
 
     CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id);
+
+    -- Application settings (key-value store)
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
     """)
 
     # Migrate existing databases: add new columns if missing
@@ -266,6 +272,40 @@ def init_db():
     conn.commit()
     conn.close()
     print(f"Database initialized at {SQLITE_DB_PATH}")
+
+
+def get_setting(key: str, default: str = None) -> str | None:
+    """Get a setting value from the database."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+    finally:
+        conn.close()
+
+
+def set_setting(key: str, value: str):
+    """Set a setting value in the database."""
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = ?",
+            (key, value, value),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_all_settings() -> dict:
+    """Get all settings as a dict."""
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return {row["key"]: row["value"] for row in rows}
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

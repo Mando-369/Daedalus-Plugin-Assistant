@@ -44,6 +44,7 @@ const App = (() => {
         if (tab === 'browse') loadPlugins();
         if (tab === 'review') loadReviewPlugins();
         if (tab === 'stats') loadStats();
+        if (tab === 'settings') loadSettings();
     }
 
     // ── Chat ────────────────────────────────────
@@ -962,6 +963,152 @@ const App = (() => {
         };
     }
 
+    // ── Settings ────────────────────────────────
+    const PROVIDER_URLS = {
+        ollama: 'http://127.0.0.1:11434',
+        gemini: 'https://generativelanguage.googleapis.com/v1beta/openai',
+        openai: 'https://api.openai.com/v1',
+        deepseek: 'https://api.deepseek.com',
+    };
+
+    const PROVIDER_MODELS = {
+        ollama: 'gemma4:26b',
+        gemini: 'gemini-2.5-flash',
+        openai: 'gpt-4o-mini',
+        deepseek: 'deepseek-chat',
+    };
+
+    async function loadSettings() {
+        try {
+            const [settings, sysInfo] = await Promise.all([
+                fetch('/api/settings').then(r => r.json()),
+                fetch('/api/settings/system-info').then(r => r.json()),
+            ]);
+
+            // System info
+            document.getElementById('system-info-content').innerHTML = `
+                <p><strong>${sysInfo.ram_gb}GB RAM</strong> | ${sysInfo.chip} | ${sysInfo.platform}</p>
+                <p class="settings-recommendation">${sysInfo.recommendation}</p>
+            `;
+
+            // Fill form
+            const provider = settings.llm_provider || 'ollama';
+            document.getElementById('set-llm-provider').value = provider;
+            document.getElementById('set-llm-model').value = settings.llm_model || PROVIDER_MODELS[provider] || '';
+            document.getElementById('set-llm-url').value = settings.llm_base_url || PROVIDER_URLS[provider] || '';
+            document.getElementById('set-llm-key').value = '';
+            document.getElementById('set-llm-temp').value = settings.llm_temperature || '0.3';
+            document.getElementById('set-llm-temp-val').textContent = settings.llm_temperature || '0.3';
+
+            onProviderChange('llm');
+
+            // Agent settings
+            if (settings.agent_provider) {
+                document.getElementById('set-agent-same').checked = false;
+                document.getElementById('agent-settings').classList.remove('hidden');
+                document.getElementById('set-agent-provider').value = settings.agent_provider;
+                document.getElementById('set-agent-model').value = settings.agent_model || '';
+            }
+
+            // Temperature slider
+            document.getElementById('set-llm-temp').oninput = (e) => {
+                document.getElementById('set-llm-temp-val').textContent = e.target.value;
+            };
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+        }
+    }
+
+    function onProviderChange(prefix) {
+        const provider = document.getElementById(`set-${prefix}-provider`).value;
+        const urlEl = document.getElementById(`${prefix}-url-group`);
+        const keyEl = document.getElementById(`${prefix}-key-group`);
+
+        // Auto-fill URL and model
+        if (PROVIDER_URLS[provider]) {
+            document.getElementById(`set-${prefix}-url`).value = PROVIDER_URLS[provider];
+        }
+        if (PROVIDER_MODELS[provider]) {
+            document.getElementById(`set-${prefix}-model`).value = PROVIDER_MODELS[provider];
+        }
+
+        // Show/hide API key field
+        if (keyEl) {
+            if (provider === 'ollama') {
+                keyEl.classList.add('hidden');
+            } else {
+                keyEl.classList.remove('hidden');
+            }
+        }
+    }
+
+    function toggleAgentSettings() {
+        const same = document.getElementById('set-agent-same').checked;
+        document.getElementById('agent-settings').classList.toggle('hidden', same);
+    }
+
+    async function testConnection() {
+        const resultEl = document.getElementById('test-result');
+        resultEl.textContent = 'Testing...';
+        resultEl.style.color = 'var(--text-secondary)';
+
+        try {
+            const resp = await fetch('/api/settings/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: document.getElementById('set-llm-provider').value,
+                    base_url: document.getElementById('set-llm-url').value,
+                    model: document.getElementById('set-llm-model').value,
+                    api_key: document.getElementById('set-llm-key').value || undefined,
+                }),
+            });
+            const data = await resp.json();
+            if (data.status === 'connected') {
+                resultEl.textContent = `Connected: ${data.model} (${data.provider})`;
+                resultEl.style.color = 'var(--success)';
+            } else {
+                resultEl.textContent = `Error: ${data.error}`;
+                resultEl.style.color = 'var(--error)';
+            }
+        } catch (e) {
+            resultEl.textContent = `Error: ${e.message}`;
+            resultEl.style.color = 'var(--error)';
+        }
+    }
+
+    async function saveSettings() {
+        const resultEl = document.getElementById('save-result');
+        const settings = {
+            llm_provider: document.getElementById('set-llm-provider').value,
+            llm_base_url: document.getElementById('set-llm-url').value,
+            llm_model: document.getElementById('set-llm-model').value,
+            llm_temperature: document.getElementById('set-llm-temp').value,
+        };
+
+        const apiKey = document.getElementById('set-llm-key').value;
+        if (apiKey) settings.llm_api_key = apiKey;
+
+        if (!document.getElementById('set-agent-same').checked) {
+            settings.agent_provider = document.getElementById('set-agent-provider').value;
+            settings.agent_model = document.getElementById('set-agent-model').value;
+        }
+
+        try {
+            await fetch('/api/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+            });
+            resultEl.textContent = 'Settings saved';
+            resultEl.style.color = 'var(--success)';
+            setTimeout(() => { resultEl.textContent = ''; }, 3000);
+        } catch (e) {
+            resultEl.textContent = `Error: ${e.message}`;
+            resultEl.style.color = 'var(--error)';
+        }
+    }
+
     // ── Markdown Rendering ───────────────────────
     function renderMarkdown(text) {
         // Escape HTML first
@@ -1041,6 +1188,11 @@ const App = (() => {
         triggerScan,
         startEnrichment,
         enrichSingle,
+        loadSettings,
+        onProviderChange,
+        toggleAgentSettings,
+        testConnection,
+        saveSettings,
         webSearchFromInput,
         searchOnlineForResponse,
         newConversation,

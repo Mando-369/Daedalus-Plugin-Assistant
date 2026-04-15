@@ -12,16 +12,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import httpx
-
-from config import (
-    OLLAMA_BASE_URL, OLLAMA_MODEL, OLLAMA_KEEP_ALIVE,
-    OLLAMA_CONTEXT_LENGTH, OLLAMA_NUM_PREDICT,
-)
+from src.llm_client import get_agent_client
 
 
 class AgentRunner:
-    """Runs an LLM agent with tool-calling loop via Ollama."""
+    """Runs an LLM agent with tool-calling loop."""
 
     def __init__(
         self,
@@ -36,7 +31,7 @@ class AgentRunner:
         self.tools = tools                  # Ollama tool schemas
         self.tool_handlers = tool_handlers  # name -> callable
         self.max_iterations = max_iterations
-        self.model = model or OLLAMA_MODEL
+        self.model = model  # None = use client default
         self.temperature = temperature
 
     def run(self, user_message: str, on_step=None) -> dict:
@@ -143,27 +138,14 @@ class AgentRunner:
         return parsed
 
     def _call_llm(self, messages: list, include_tools: bool = True) -> dict:
-        """Send messages to Ollama and return the response."""
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "temperature": self.temperature,
-                "num_predict": OLLAMA_NUM_PREDICT,
-                "num_ctx": OLLAMA_CONTEXT_LENGTH,
-            },
-            "keep_alive": OLLAMA_KEEP_ALIVE,
-        }
-        if include_tools and self.tools:
-            payload["tools"] = self.tools
-
-        with httpx.Client(
-            timeout=httpx.Timeout(connect=10, read=300, write=10, pool=10)
-        ) as client:
-            resp = client.post(f"{OLLAMA_BASE_URL}/api/chat", json=payload)
-            resp.raise_for_status()
-            return resp.json()
+        """Send messages to the LLM and return the response."""
+        client = get_agent_client()
+        tools = self.tools if include_tools else None
+        return client.chat(
+            messages,
+            tools=tools,
+            temperature=self.temperature,
+        )
 
     @staticmethod
     def _is_thin_result(result: dict) -> bool:
