@@ -121,7 +121,7 @@ SEARXNG_URL=$(python3 -c "from config import SEARXNG_URL; print(SEARXNG_URL)")
 
 if curl -s "${SEARXNG_URL}" >/dev/null 2>&1; then
     echo -e "${GREEN}  ✓ SearXNG is running at ${SEARXNG_URL}${NC}"
-elif command -v docker &>/dev/null; then
+elif command -v docker &>/dev/null && docker info &>/dev/null; then
     # Check if container exists but is stopped
     if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -q '^searxng$'; then
         echo -e "  Starting existing SearXNG container..."
@@ -145,10 +145,13 @@ elif command -v docker &>/dev/null; then
             echo -e "${YELLOW}  ⚠ SearXNG container created but not responding yet (may need a moment)${NC}"
         fi
     fi
+elif command -v docker &>/dev/null; then
+    echo -e "${YELLOW}  ⚠ Docker is installed but not running${NC}"
+    echo -e "${YELLOW}    Open Docker Desktop first, then restart this script${NC}"
+    echo -e "${YELLOW}    Falling back to DuckDuckGo (may rate-limit)${NC}"
 else
-    echo -e "${YELLOW}  ⚠ SearXNG not running (no Docker found)${NC}"
-    echo -e "${YELLOW}    Install Docker, then run:${NC}"
-    echo -e "${YELLOW}    docker run -d --name searxng -p 8888:8080 searxng/searxng${NC}"
+    echo -e "${YELLOW}  ⚠ Docker not installed${NC}"
+    echo -e "${YELLOW}    Install Docker Desktop from https://docker.com${NC}"
     echo -e "${YELLOW}    Falling back to DuckDuckGo (may rate-limit)${NC}"
 fi
 
