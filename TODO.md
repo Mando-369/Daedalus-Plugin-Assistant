@@ -47,7 +47,7 @@
 - [x] Consistency validation (catches wrong-product data)
 - [x] Live-refresh review list during enrichment
 - [ ] Auto-enrich newly scanned plugins (prompt user after scan)
-- [ ] LLM searches chat history for faster answers
+- [x] LLM searches past user queries for preference context (safe -- no answer amplification)
 
 ### UI/UX
 - [ ] Plugin comparison view (side-by-side metadata)
