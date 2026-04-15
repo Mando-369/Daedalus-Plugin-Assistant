@@ -349,17 +349,59 @@ const App = (() => {
     }
 
     // ── Review Tab ──────────────────────────────
+    let reviewDebounceTimer = null;
+
     async function loadReviewPlugins(page = 1) {
         reviewPage = page;
         try {
-            const resp = await fetch(`/api/plugins?needs_review=true&page=${page}`);
+            const params = new URLSearchParams({ needs_review: 'true', page });
+            const search = document.getElementById('review-search')?.value.trim();
+            if (search) params.set('search', search);
+            const dev = document.getElementById('review-filter-developer')?.value;
+            if (dev) params.set('developer', dev);
+
+            const resp = await fetch(`/api/plugins?${params}`);
             const data = await resp.json();
             renderPluginGrid('review-list', data.plugins);
             renderPagination('review-pagination', data.page, data.pages, loadReviewPlugins);
+
+            // Populate developer filter from review plugins
+            _populateReviewDevFilter(data.plugins);
         } catch (e) {
             document.getElementById('review-list').innerHTML =
                 '<p class="empty-state">Failed to load review queue.</p>';
         }
+    }
+
+    function _populateReviewDevFilter(plugins) {
+        const select = document.getElementById('review-filter-developer');
+        if (!select) return;
+        const current = select.value;
+        // Only populate once (check if has options beyond default)
+        if (select.options.length > 1) return;
+
+        // Fetch all review plugin developers
+        fetch('/api/plugins?needs_review=true&per_page=9999')
+            .then(r => r.json())
+            .then(data => {
+                const devs = {};
+                (data.plugins || []).forEach(p => {
+                    if (p.developer) devs[p.developer] = (devs[p.developer] || 0) + 1;
+                });
+                const sorted = Object.entries(devs).sort((a, b) => a[0].localeCompare(b[0]));
+                sorted.forEach(([dev, count]) => {
+                    const opt = document.createElement('option');
+                    opt.value = dev;
+                    opt.textContent = `${dev} (${count})`;
+                    select.appendChild(opt);
+                });
+                select.value = current;
+            });
+    }
+
+    function debouncedReview() {
+        clearTimeout(reviewDebounceTimer);
+        reviewDebounceTimer = setTimeout(() => loadReviewPlugins(1), 300);
     }
 
     async function loadReviewBadge() {
@@ -1455,6 +1497,7 @@ const App = (() => {
         handleChatKey,
         loadPlugins,
         debouncedBrowse,
+        debouncedReview,
         openEdit,
         closeModal,
         savePlugin,
