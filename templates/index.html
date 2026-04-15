@@ -264,7 +264,7 @@
                         <div class="form-grid" style="margin-top: 8px;">
                             <div class="form-group">
                                 <label for="set-agent-provider">Provider</label>
-                                <select id="set-agent-provider">
+                                <select id="set-agent-provider" onchange="App.onAgentProviderChange()">
                                     <option value="ollama">Local Ollama</option>
                                     <option value="euria">Euria / Infomaniak</option>
                                     <option value="openrouter">OpenRouter (free)</option>

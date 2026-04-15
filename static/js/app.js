@@ -1186,8 +1186,12 @@ const App = (() => {
     async function _loadModels(prefix, provider) {
         const select = document.getElementById(`set-${prefix}-model`);
         const defaultModel = PROVIDER_MODELS[provider] || '';
-        const baseUrl = document.getElementById(`set-${prefix}-url`)?.value || '';
-        const apiKey = document.getElementById(`set-${prefix}-key`)?.value || '';
+        // Agent section has no URL/key fields -- fall back to chat fields or provider defaults
+        const baseUrl = document.getElementById(`set-${prefix}-url`)?.value
+            || document.getElementById('set-llm-url')?.value
+            || PROVIDER_URLS[provider] || '';
+        const apiKey = document.getElementById(`set-${prefix}-key`)?.value
+            || document.getElementById('set-llm-key')?.value || '';
 
         // Reset to default while loading
         select.innerHTML = `<option value="${defaultModel}">${defaultModel || 'Loading...'}</option>`;
@@ -1221,6 +1225,12 @@ const App = (() => {
     function toggleAgentSettings() {
         const same = document.getElementById('set-agent-same').checked;
         document.getElementById('agent-settings').classList.toggle('hidden', same);
+        if (!same) onAgentProviderChange();
+    }
+
+    function onAgentProviderChange() {
+        const provider = document.getElementById('set-agent-provider').value;
+        _loadModels('agent', provider);
     }
 
     async function testConnection() {
@@ -1460,6 +1470,7 @@ const App = (() => {
         resetScanDirs,
         onProviderChange,
         toggleAgentSettings,
+        onAgentProviderChange,
         testConnection,
         saveSettings,
         webSearchFromInput,
