@@ -1270,7 +1270,7 @@ const App = (() => {
             <div class="scan-dir-row">
                 <span class="scan-dir-path">${esc(d.path)}</span>
                 <span class="scan-dir-meta">${d.format} | ${d.scope}</span>
-                <button class="btn-dismiss" onclick="App.removeScanDir(${i})" title="Remove">&times;</button>
+                <button class="btn-remove" onclick="App.removeScanDir(${i})" title="Remove">&times;</button>
             </div>
         `).join('');
     }
