@@ -1276,8 +1276,10 @@ const App = (() => {
         if (apiKey) settings.llm_api_key = apiKey;
 
         if (!document.getElementById('set-agent-same').checked) {
-            settings.agent_provider = document.getElementById('set-agent-provider').value;
+            const agentProvider = document.getElementById('set-agent-provider').value;
+            settings.agent_provider = agentProvider;
             settings.agent_model = document.getElementById('set-agent-model').value;
+            settings.agent_base_url = PROVIDER_URLS[agentProvider] || '';
         }
 
         try {
