@@ -1003,10 +1003,31 @@ const App = (() => {
         _launchEnrichmentWs({ plugin_ids: pluginIds, delay: 2, batch_limit: 0 });
     }
 
-    function startEnrichment() {
+    async function startEnrichment() {
         const delay = parseInt(document.getElementById('enrich-delay').value) || 2;
         const batchLimit = parseInt(document.getElementById('enrich-batch-limit').value) || 0;
-        _launchEnrichmentWs({ delay, batch_limit: batchLimit });
+
+        // Get current filters to only enrich visible plugins
+        const params = new URLSearchParams({ needs_review: 'true', per_page: '9999' });
+        const search = document.getElementById('review-search')?.value.trim();
+        if (search) params.set('search', search);
+        const dev = document.getElementById('review-filter-developer')?.value;
+        if (dev) params.set('developer', dev);
+
+        try {
+            const resp = await fetch(`/api/plugins?${params}`);
+            const data = await resp.json();
+            const ids = (data.plugins || []).map(p => p.id);
+
+            if (!ids.length) {
+                alert('No plugins match the current filter.');
+                return;
+            }
+
+            _launchEnrichmentWs({ plugin_ids: ids, delay, batch_limit: batchLimit });
+        } catch (e) {
+            alert(`Failed to get plugin list: ${e.message}`);
+        }
     }
 
     function _launchEnrichmentWs(config) {
