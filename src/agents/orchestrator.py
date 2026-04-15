@@ -157,9 +157,11 @@ class EnrichmentOrchestrator:
             else:
                 rows = conn.execute("""
                     SELECT * FROM plugins
-                    WHERE classification_confidence IN ('unclassified', 'low')
+                    WHERE needs_review = 1
+                       AND is_own_plugin = 0
+                       AND (classification_confidence IN ('unclassified', 'low')
                        OR developer IS NULL OR developer = ''
-                       OR description IS NULL OR description = ''
+                       OR description IS NULL OR description = '')
                     ORDER BY
                         CASE classification_confidence
                             WHEN 'unclassified' THEN 0

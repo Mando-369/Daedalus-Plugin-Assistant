@@ -471,6 +471,10 @@ const App = (() => {
             if (p.character) tags.push(`<span class="meta-tag character">${esc(p.character)}</span>`);
             if (p.is_own_plugin) tags.push(`<span class="meta-tag own">${esc(p.own_brand || 'Own')}</span>`);
 
+            const dismissBtn = containerId === 'review-list'
+                ? `<button class="btn-dismiss" onclick="event.stopPropagation(); App.dismissPlugin(${p.id})" title="Exclude from enrichment">&times;</button>`
+                : '';
+
             return `
                 <div class="plugin-card${ownClass}" onclick="App.openEdit(${p.id})">
                     <div class="plugin-card-header">
@@ -479,6 +483,7 @@ const App = (() => {
                             ${esc(p.display_name || p.name)}
                         </span>
                         <span class="plugin-format">${p.formats ? p.formats.join(' | ') : esc(p.format)}</span>
+                        ${dismissBtn}
                     </div>
                     ${p.developer ? `<div class="plugin-developer">${esc(p.developer)}</div>` : ''}
                     ${p.description ? `<div class="plugin-description">${esc(p.description)}</div>` : ''}
@@ -815,6 +820,21 @@ const App = (() => {
     function searchConversations() {
         const q = document.getElementById('conv-search').value.trim();
         loadConversations(q || null);
+    }
+
+    // ── Dismiss Plugin from Review ────────────────
+    async function dismissPlugin(pluginId) {
+        try {
+            await fetch(`/api/plugins/${pluginId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ needs_review: false }),
+            });
+            loadReviewPlugins(reviewPage);
+            loadReviewBadge();
+        } catch (e) {
+            console.error('Failed to dismiss plugin:', e);
+        }
     }
 
     // ── Per-Plugin Enrichment ───────────────────
@@ -1265,6 +1285,7 @@ const App = (() => {
         savePlugin,
         triggerScan,
         startEnrichment,
+        dismissPlugin,
         pauseEnrichment,
         cancelEnrichment,
         enrichSingle,

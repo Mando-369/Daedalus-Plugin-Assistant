@@ -870,6 +870,26 @@ body {
 .hidden { display: none !important; }
 
 /* ── Enrichment Queue ─────────────────────── */
+.btn-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.plugin-card:hover .btn-dismiss {
+    opacity: 1;
+}
+
+.btn-dismiss:hover {
+    color: var(--error);
+}
+
 .enrich-controls {
     display: flex;
     gap: 8px;
