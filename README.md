@@ -87,12 +87,12 @@ Everything runs locally. Ollama runs on your machine, the database is local SQLi
 ### Scanning Plugins
 
 Click **Rescan Plugins** to discover all installed AU and VST3 plugins. The scanner:
-1. Reads plugin directories on disk
-2. Extracts developer and plugin type from bundle metadata (Info.plist)
+1. Reads plugin directories on disk (configurable in Settings tab)
+2. Extracts developer, plugin type, and display names from bundle metadata (Info.plist)
 3. Cross-references AU metadata to VST3 versions of the same plugin
 4. Runs static classification against 1000+ known plugins
 5. Builds vector embeddings for semantic search
-6. Detects newly installed plugins and reports them for enrichment
+6. Detects newly installed plugins and offers to auto-enrich them
 
 ### Chat
 
@@ -102,9 +102,9 @@ Ask questions in natural language:
 - "Compare my optical compressors"
 - "Which plugins emulate the LA-2A?"
 
-The assistant searches your plugin database using hybrid SQL FTS + semantic vector search, then generates a contextual answer with your local LLM. Responses render with full markdown formatting (headers, lists, code, bold).
+The assistant searches your plugin database using hybrid SQL FTS + semantic vector search, then generates a contextual answer with your local LLM. Responses render with full markdown formatting (headers, lists, code, bold). Past user queries are searched for preference context so the assistant remembers your workflow across conversations.
 
-Conversations are saved automatically and accessible from the sidebar. Search past conversations or start a new one anytime.
+Conversations are saved automatically and accessible from the sidebar. Search past conversations or start a new one anytime. Use **Search Online** to enrich answers with live web results via SearXNG.
 
 ### Enrichment
 
@@ -118,8 +118,11 @@ Conversations are saved automatically and accessible from the sidebar. Search pa
 
 #### Bulk (Review Tab)
 1. Go to the **Review** tab
-2. Click **Enrich with Web Search**
-3. Watch streaming progress as agents process each unclassified plugin
+2. Set options: delay between plugins (default 2s) and batch limit (auto-pause after N plugins)
+3. Click **Enrich with Web Search**
+4. Watch the progress bar as agents process each plugin in real-time
+5. **Pause/Resume/Cancel** anytime -- auto-pauses on rate limits or batch limits
+6. Dismiss individual plugins from the queue with the X button
 
 ### Editing & Review
 
@@ -142,6 +145,8 @@ Click the **Settings** tab to configure your LLM backend. A provider comparison 
 | **DeepSeek** | Very cheap | Cloud (China) | Global | Budget option, strong reasoning |
 
 Default is **Local Ollama**. You can set separate models for chat and enrichment agents (e.g., fast local model for agents, powerful cloud model for chat). Test your connection from the Settings tab before saving.
+
+The Settings tab also lets you configure **scan directories** -- add, remove, or reset the plugin folders that get scanned.
 
 ## Configuration
 
