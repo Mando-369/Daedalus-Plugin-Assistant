@@ -50,7 +50,6 @@
 - [ ] LLM searches chat history for faster answers
 
 ### UI/UX
-- [ ] Render `<think>` tags as styled/collapsible reasoning block in chat UI
 - [ ] Plugin comparison view (side-by-side metadata)
 - [ ] Export/import plugin database (JSON/CSV)
 - [ ] Dark/light theme toggle
