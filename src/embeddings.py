@@ -29,7 +29,11 @@ class PluginEmbeddingStore:
             path=str(CHROMA_DB_PATH),
             settings=Settings(anonymized_telemetry=False),
         )
-        self.collection = self.client.get_or_create_collection(
+        self.collection = self._get_collection()
+
+    def _get_collection(self):
+        """Get or create the collection, recovering from stale references."""
+        return self.client.get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
             metadata={"hnsw:space": "cosine"},
         )
@@ -128,12 +132,22 @@ class PluginEmbeddingStore:
             # Get embeddings from Ollama
             embeddings = self._embed_via_ollama(documents)
 
-            self.collection.upsert(
-                ids=ids,
-                documents=documents,
-                embeddings=embeddings,
-                metadatas=metadatas,
-            )
+            try:
+                self.collection.upsert(
+                    ids=ids,
+                    documents=documents,
+                    embeddings=embeddings,
+                    metadatas=metadatas,
+                )
+            except Exception:
+                # Collection reference may be stale; refresh and retry
+                self.collection = self._get_collection()
+                self.collection.upsert(
+                    ids=ids,
+                    documents=documents,
+                    embeddings=embeddings,
+                    metadatas=metadatas,
+                )
 
             total += len(batch)
             print(f"  Embedded {total}/{len(plugins)} plugins...")
@@ -156,7 +170,11 @@ class PluginEmbeddingStore:
         if where:
             kwargs["where"] = where
 
-        results = self.collection.query(**kwargs)
+        try:
+            results = self.collection.query(**kwargs)
+        except Exception:
+            self.collection = self._get_collection()
+            results = self.collection.query(**kwargs)
 
         output = []
         if results and results["ids"] and results["ids"][0]:
@@ -173,14 +191,15 @@ class PluginEmbeddingStore:
     def delete_all(self):
         """Clear the entire collection (for full rescan)."""
         self.client.delete_collection(CHROMA_COLLECTION_NAME)
-        self.collection = self.client.get_or_create_collection(
-            name=CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
+        self.collection = self._get_collection()
 
     def count(self) -> int:
         """Return the number of documents in the collection."""
-        return self.collection.count()
+        try:
+            return self.collection.count()
+        except Exception:
+            self.collection = self._get_collection()
+            return self.collection.count()
 
 
 if __name__ == "__main__":

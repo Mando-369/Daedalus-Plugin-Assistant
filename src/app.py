@@ -273,10 +273,13 @@ async def update_plugin(plugin_id: int, update: PluginUpdate):
 
         conn.commit()
 
-        # Re-embed this plugin
+        # Re-embed this plugin (non-blocking: save succeeds even if embedding fails)
         row = conn.execute("SELECT * FROM plugins WHERE id = ?", (plugin_id,)).fetchone()
         if row:
-            get_embeddings().upsert_plugins([dict(row)])
+            try:
+                get_embeddings().upsert_plugins([dict(row)])
+            except Exception as e:
+                print(f"Warning: failed to re-embed plugin {plugin_id}: {e}")
 
         return {"status": "updated", "plugin_id": plugin_id}
     finally:
