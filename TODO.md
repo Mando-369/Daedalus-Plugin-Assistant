@@ -37,10 +37,17 @@
 - [x] Embeddings always stay local (nomic-embed-text via Ollama)
 
 ### Enrichment Improvements
-- [ ] Bulk enrichment progress in UI (currently basic WebSocket updates)
+- [x] Bulk enrichment progress bar with real-time streaming
+- [x] Enrichment queue with pause/resume/cancel + batch limits
+- [x] Rate limit auto-detection and auto-pause
+- [x] Configurable delay between plugins (throttling)
+- [x] Dismiss button on review cards (exclude from enrichment)
+- [x] Bulk enrichment skips own plugins
+- [x] Re-enrich confirmation dialog (force replace vs fill-only)
+- [x] Consistency validation (catches wrong-product data)
+- [x] Live-refresh review list during enrichment
 - [ ] Auto-enrich newly scanned plugins (prompt user after scan)
 - [ ] LLM searches chat history for faster answers
-- [ ] Enrichment queue with pause/resume
 
 ### UI/UX
 - [ ] Render `<think>` tags as styled/collapsible reasoning block in chat UI
