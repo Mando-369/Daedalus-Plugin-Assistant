@@ -97,6 +97,7 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {
         "request": request,
         "title": UI_TITLE,
+        "cache_bust": int(__import__('time').time()),
     })
 
 

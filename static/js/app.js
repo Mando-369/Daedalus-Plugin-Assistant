@@ -267,7 +267,10 @@ const App = (() => {
             ]);
 
             const catSelect = document.getElementById('filter-category');
+            const catCurrent = catSelect.value;
+            catSelect.innerHTML = '<option value="">All Categories</option>';
             const catList = document.getElementById('category-list');
+            if (catList) catList.innerHTML = '';
             cats.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.category;
@@ -281,10 +284,12 @@ const App = (() => {
                     catList.appendChild(dlOpt);
                 }
             });
+            catSelect.value = catCurrent;
 
             // Populate subcategory datalist for edit modal
             const subcatList = document.getElementById('subcategory-list');
             if (subcatList) {
+                subcatList.innerHTML = '';
                 subcats.forEach(s => {
                     const opt = document.createElement('option');
                     opt.value = s;
@@ -293,12 +298,15 @@ const App = (() => {
             }
 
             const devSelect = document.getElementById('filter-developer');
+            const devCurrent = devSelect.value;
+            devSelect.innerHTML = '<option value="">All Developers</option>';
             devs.forEach(d => {
                 const opt = document.createElement('option');
                 opt.value = d.developer;
                 opt.textContent = `${d.developer} (${d.count})`;
                 devSelect.appendChild(opt);
             });
+            devSelect.value = devCurrent;
         } catch (e) {
             console.error('Failed to load filters:', e);
         }
@@ -959,6 +967,7 @@ const App = (() => {
 
             // Refresh all views
             loadFilters();
+            _populateReviewDevFilter();
             loadStats();
             loadReviewBadge();
             const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
@@ -1113,6 +1122,7 @@ const App = (() => {
         cancelBtn.classList.add('hidden');
         enrichWs = null;
         loadReviewPlugins(1);
+        _populateReviewDevFilter();
         loadReviewBadge();
         loadStats();
         loadFilters();
@@ -1538,6 +1548,7 @@ const App = (() => {
         switchConversation,
         deleteConversation,
         searchConversations,
+        loadReviewPlugins,
         _paginate,
     };
 })();
