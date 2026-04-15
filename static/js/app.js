@@ -920,9 +920,6 @@ const App = (() => {
             const resp = await fetch('/api/scan', { method: 'POST' });
             const data = await resp.json();
             let statusText = `Scan complete: ${data.scanned} scanned, ${data.inserted} new, ${data.updated} updated, ${data.embedded} embedded`;
-            if (data.new_plugin_ids && data.new_plugin_ids.length > 0) {
-                statusText += ` | ${data.new_plugin_ids.length} new plugins ready for enrichment`;
-            }
             status.textContent = statusText;
 
             // Refresh all views
@@ -932,6 +929,21 @@ const App = (() => {
             const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
             if (activeTab === 'browse') loadPlugins(1);
             if (activeTab === 'review') loadReviewPlugins(1);
+
+            // Offer to enrich new plugins
+            if (data.new_plugin_ids && data.new_plugin_ids.length > 0) {
+                const count = data.new_plugin_ids.length;
+                const enrich = confirm(
+                    `${count} new plugin${count > 1 ? 's' : ''} found!\n\n` +
+                    `Do you want to enrich ${count > 1 ? 'them' : 'it'} with web research?\n` +
+                    `This will run the AI agents to find descriptions, character, and tips.`
+                );
+                if (enrich) {
+                    // Switch to review tab and start enrichment for new plugins only
+                    switchTab('review');
+                    _startEnrichmentForIds(data.new_plugin_ids);
+                }
+            }
         } catch (e) {
             status.textContent = `Scan failed: ${e.message}`;
         } finally {
@@ -942,15 +954,26 @@ const App = (() => {
     // ── Enrichment ──────────────────────────────
     let enrichWs = null;
 
+    function _startEnrichmentForIds(pluginIds) {
+        // Set default options and trigger enrichment with specific plugin IDs
+        document.getElementById('enrich-delay').value = '2';
+        document.getElementById('enrich-batch-limit').value = '0';
+        _launchEnrichmentWs({ plugin_ids: pluginIds, delay: 2, batch_limit: 0 });
+    }
+
     function startEnrichment() {
+        const delay = parseInt(document.getElementById('enrich-delay').value) || 2;
+        const batchLimit = parseInt(document.getElementById('enrich-batch-limit').value) || 0;
+        _launchEnrichmentWs({ delay, batch_limit: batchLimit });
+    }
+
+    function _launchEnrichmentWs(config) {
         const btn = document.getElementById('enrich-btn');
         const pauseBtn = document.getElementById('enrich-pause-btn');
         const cancelBtn = document.getElementById('enrich-cancel-btn');
         const progressEl = document.getElementById('enrich-progress');
         const statusEl = document.getElementById('enrich-status');
         const fillEl = document.getElementById('enrich-progress-fill');
-        const delay = parseInt(document.getElementById('enrich-delay').value) || 2;
-        const batchLimit = parseInt(document.getElementById('enrich-batch-limit').value) || 0;
 
         btn.classList.add('hidden');
         pauseBtn.classList.remove('hidden');
@@ -964,7 +987,7 @@ const App = (() => {
         enrichWs = new WebSocket(`${proto}//${location.host}/ws/enrich`);
 
         enrichWs.onopen = () => {
-            enrichWs.send(JSON.stringify({ delay, batch_limit: batchLimit }));
+            enrichWs.send(JSON.stringify(config));
         };
 
         enrichWs.onmessage = (event) => {

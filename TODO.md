@@ -46,7 +46,7 @@
 - [x] Re-enrich confirmation dialog (force replace vs fill-only)
 - [x] Consistency validation (catches wrong-product data)
 - [x] Live-refresh review list during enrichment
-- [ ] Auto-enrich newly scanned plugins (prompt user after scan)
+- [x] Auto-enrich newly scanned plugins (confirm dialog after scan, enriches new plugins only)
 - [x] LLM searches past user queries for preference context (safe -- no answer amplification)
 
 ### UI/UX
