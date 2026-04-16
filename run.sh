@@ -186,4 +186,9 @@ echo -e "${GREEN}  Press Ctrl+C to stop${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════${NC}"
 echo
 
-python3 -m uvicorn src.app:app --host "${WEB_HOST}" --port "${WEB_PORT}" --reload
+trap '' INT
+python3 -m uvicorn src.app:app --host "${WEB_HOST}" --port "${WEB_PORT}" --reload || true
+echo
+echo -e "${CYAN}  Server stopped. Restart with:${NC}"
+echo -e "${CYAN}  ./run.sh${NC}"
+echo
