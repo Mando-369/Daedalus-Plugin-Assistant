@@ -156,6 +156,9 @@ In the **Settings** tab under **Data Management** you can export and import your
 - **Export CSV** -- opens in Excel, Numbers, or Google Sheets. Best for browsing your plugin list in a spreadsheet, filtering/sorting manually, or sharing with someone who doesn't use Daedalus.
 - **Import** -- upload a previously exported `.json` or `.csv` file. Only updates plugins you already have scanned (matched by filename, format, and scope). Empty fields get filled from the import; existing data is never overwritten.
 
+![JSON Export](docs/screenshots/json.png)
+![CSV Export in Numbers](docs/screenshots/csv.png)
+
 ## Configuration
 
 Key settings in `config.py` (runtime settings are managed via the Settings tab in the UI):
