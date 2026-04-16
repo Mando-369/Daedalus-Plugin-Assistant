@@ -1448,6 +1448,40 @@ const App = (() => {
         }
     }
 
+    // ── Export / Import ─────────────────────────
+    function exportPlugins(format) {
+        window.location.href = `/api/export?format=${format}`;
+    }
+
+    async function importPlugins() {
+        const input = document.getElementById('import-file');
+        const resultEl = document.getElementById('import-result');
+        const file = input.files[0];
+        if (!file) return;
+
+        resultEl.textContent = 'Importing...';
+        resultEl.style.color = 'var(--muted)';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const resp = await fetch('/api/import', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (!resp.ok) {
+                resultEl.textContent = data.detail || 'Import failed';
+                resultEl.style.color = 'var(--error)';
+            } else {
+                resultEl.textContent = `Done — ${data.updated} updated, ${data.skipped} skipped`;
+                resultEl.style.color = 'var(--success)';
+            }
+        } catch (e) {
+            resultEl.textContent = `Error: ${e.message}`;
+            resultEl.style.color = 'var(--error)';
+        }
+        input.value = '';
+    }
+
     // ── Markdown Rendering ───────────────────────
     function renderMarkdown(text) {
         // Escape HTML first
@@ -1549,6 +1583,8 @@ const App = (() => {
         deleteConversation,
         searchConversations,
         loadReviewPlugins,
+        exportPlugins,
+        importPlugins,
         _paginate,
     };
 })();

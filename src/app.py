@@ -18,10 +18,10 @@ os.environ["CHROMA_TELEMETRY"] = "False"
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -271,6 +271,15 @@ async def update_plugin(plugin_id: int, update: PluginUpdate):
                     (plugin_id,),
                 )
 
+        # Propagate is_own_plugin to same-name plugins (AU<->VST3)
+        if "is_own_plugin" in fields:
+            row_name = conn.execute("SELECT name FROM plugins WHERE id = ?", (plugin_id,)).fetchone()
+            if row_name:
+                conn.execute(
+                    "UPDATE plugins SET is_own_plugin = ?, updated_at = ? WHERE LOWER(name) = LOWER(?) AND id != ?",
+                    (fields["is_own_plugin"], fields["updated_at"], row_name["name"], plugin_id),
+                )
+
         conn.commit()
 
         # Re-embed this plugin (non-blocking: save succeeds even if embedding fails)
@@ -490,6 +499,164 @@ async def get_stats():
         }
     finally:
         conn.close()
+
+
+# ── Export / Import ───────────────────────────────
+
+EXPORT_FIELDS = [
+    "name", "display_name", "developer",
+    "format", "file_name", "install_scope",
+    "plugin_type", "category", "subcategory", "subtype", "emulation_of",
+    "description", "specialty", "best_used_for", "character",
+    "signal_chain_position", "tags", "notes", "hidden_tips", "not_ideal_for",
+    "classification_confidence", "needs_review",
+]
+
+MATCH_KEYS = ("file_name", "format", "install_scope")
+
+UPDATABLE_FIELDS = [
+    "developer", "display_name", "is_own_plugin", "own_brand",
+    "plugin_type", "category", "subcategory", "subtype", "emulation_of",
+    "description", "specialty", "best_used_for", "character",
+    "signal_chain_position", "tags", "notes", "hidden_tips", "not_ideal_for",
+    "classification_confidence", "needs_review",
+]
+
+
+@app.get("/api/export")
+async def export_plugins(format: str = "json"):
+    """Export all plugins as JSON or CSV download."""
+    import csv as csv_mod
+    import io
+
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT * FROM plugins WHERE is_own_plugin = 0 ORDER BY name").fetchall()
+        plugins = [{k: dict(r)[k] for k in EXPORT_FIELDS} for r in rows]
+    finally:
+        conn.close()
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if format == "csv":
+        buf = io.StringIO()
+        writer = csv_mod.DictWriter(buf, fieldnames=EXPORT_FIELDS)
+        writer.writeheader()
+        writer.writerows(plugins)
+        content = buf.getvalue()
+        return StreamingResponse(
+            iter([content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="daedalus-plugins-{today}.csv"'},
+        )
+
+    content = json.dumps(plugins, indent=2, ensure_ascii=False)
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="daedalus-plugins-{today}.json"'},
+    )
+
+
+@app.post("/api/import")
+async def import_plugins(file: UploadFile = File(...)):
+    """Import plugins from JSON or CSV. Fill-only merge on matching plugins."""
+    import csv as csv_mod
+    import io
+
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")  # handle BOM from Excel CSV exports
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+
+    fname = (file.filename or "").lower()
+    records = []
+
+    if fname.endswith(".json"):
+        try:
+            data = json.loads(text)
+            if not isinstance(data, list):
+                raise HTTPException(400, "JSON must be an array of plugin objects")
+            records = data
+        except json.JSONDecodeError as e:
+            raise HTTPException(400, f"Invalid JSON: {e}")
+    elif fname.endswith(".csv"):
+        reader = csv_mod.DictReader(io.StringIO(text))
+        records = list(reader)
+    else:
+        raise HTTPException(400, "Unsupported format. Upload a .json or .csv file.")
+
+    conn = get_db()
+    updated = 0
+    skipped = 0
+    errors = []
+
+    try:
+        for i, rec in enumerate(records):
+            # Validate match keys are present
+            if not all(rec.get(k) for k in MATCH_KEYS):
+                skipped += 1
+                continue
+
+            # Find existing plugin
+            existing = conn.execute(
+                "SELECT * FROM plugins WHERE file_name = ? AND format = ? AND install_scope = ?",
+                (rec["file_name"], rec["format"], rec["install_scope"]),
+            ).fetchone()
+
+            if not existing:
+                skipped += 1
+                continue
+
+            # Fill-only: update fields that are empty in DB but present in import
+            existing_d = dict(existing)
+            sets = []
+            vals = []
+            for field in UPDATABLE_FIELDS:
+                import_val = rec.get(field)
+                if import_val is None or str(import_val).strip() == "":
+                    continue
+                current_val = existing_d.get(field)
+                if current_val is None or str(current_val).strip() == "":
+                    sets.append(f"{field} = ?")
+                    vals.append(import_val)
+
+            if sets:
+                vals.append(existing_d["id"])
+                conn.execute(
+                    f"UPDATE plugins SET {', '.join(sets)}, updated_at = datetime('now') WHERE id = ?",
+                    vals,
+                )
+                updated += 1
+            else:
+                skipped += 1
+
+        conn.commit()
+    except Exception as e:
+        errors.append(str(e))
+    finally:
+        conn.close()
+
+    # Re-embed updated plugins
+    if updated > 0:
+        try:
+            store = get_embeddings()
+            conn2 = get_db()
+            try:
+                all_plugins = [dict(r) for r in conn2.execute("SELECT * FROM plugins").fetchall()]
+                store.rebuild(all_plugins)
+            finally:
+                conn2.close()
+        except Exception as e:
+            errors.append(f"Embedding rebuild: {e}")
+
+    return {
+        "total_records": len(records),
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors,
+    }
 
 
 # ── Chat API (REST fallback) ──────────────────────

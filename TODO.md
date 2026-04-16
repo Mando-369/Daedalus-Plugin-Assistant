@@ -51,5 +51,5 @@
 
 ### UI/UX
 - [ ] Plugin comparison view (side-by-side metadata)
-- [ ] Export/import plugin database (JSON/CSV)
+- [x] Export/import plugin database (JSON/CSV)
 - [ ] Dark/light theme toggle

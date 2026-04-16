@@ -148,6 +148,14 @@ Default is **Local Ollama**. You can set separate models for chat and enrichment
 
 The Settings tab also lets you configure **scan directories** -- add, remove, or reset the plugin folders that get scanned.
 
+### Export / Import
+
+In the **Settings** tab under **Data Management** you can export and import your plugin database:
+
+- **Export JSON** -- machine-readable format that preserves data types exactly. Best for backup/restore between Daedalus instances since it round-trips perfectly.
+- **Export CSV** -- opens in Excel, Numbers, or Google Sheets. Best for browsing your plugin list in a spreadsheet, filtering/sorting manually, or sharing with someone who doesn't use Daedalus.
+- **Import** -- upload a previously exported `.json` or `.csv` file. Only updates plugins you already have scanned (matched by filename, format, and scope). Empty fields get filled from the import; existing data is never overwritten.
+
 ## Configuration
 
 Key settings in `config.py` (runtime settings are managed via the Settings tab in the UI):

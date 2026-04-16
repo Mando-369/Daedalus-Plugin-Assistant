@@ -318,6 +318,24 @@
                         <span id="scan-dirs-result" class="settings-status"></span>
                     </div>
                 </div>
+
+                <div class="settings-section">
+                    <h3>Data Management</h3>
+                    <p class="settings-hint" style="margin-bottom:8px">
+                        <b>JSON</b> — best for backup/restore between Daedalus instances (preserves all data types).<br>
+                        <b>CSV</b> — opens in Excel/Numbers/Sheets for browsing, filtering, or sharing.<br>
+                        <b>Import</b> — fills empty fields on plugins you already have scanned. Existing data is never overwritten.
+                    </p>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        <button class="btn btn-sm btn-primary" onclick="App.exportPlugins('json')">Export JSON</button>
+                        <button class="btn btn-sm btn-primary" onclick="App.exportPlugins('csv')">Export CSV</button>
+                        <span style="color:var(--muted);margin:0 4px">|</span>
+                        <input type="file" id="import-file" accept=".json,.csv" style="display:none"
+                               onchange="App.importPlugins()">
+                        <button class="btn btn-sm" onclick="document.getElementById('import-file').click()">Import File</button>
+                        <span id="import-result" class="settings-status"></span>
+                    </div>
+                </div>
             </div>
         </div>
 
