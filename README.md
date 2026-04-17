@@ -18,8 +18,9 @@ A local macOS application that manages, classifies, and provides intelligent sea
   - **Sonic Profile Agent** -- Finds sonic character, use cases, pro tips, and limitations from real user discussions on forums
   - **Quality self-check** -- Agents evaluate their own results and retry with different search strategies if data is thin
 - **SearXNG Search** -- Self-hosted metasearch engine (Docker) aggregating Google, Bing, Brave, and DuckDuckGo without rate limits. Falls back to DuckDuckGo if not running.
-- **RAG-Powered Chat** -- Ask natural language questions about your plugins with hybrid SQL + semantic search, markdown-rendered responses, and persistent multi-conversation history
-- **Search Online in Chat** -- Per-response "Search Online" button to enrich answers with live web results, plus a global search button to query the web directly from the chat input
+- **Web-First Chat** -- Every chat query searches the web first for grounded facts, then cross-references against your scanned collection (✓) and DAW stock plugins (🎛️). Prevents LLM hallucination and surfaces real plugins you can actually access. Silent fallback to collection-only if web is unavailable.
+- **DAW Stock Plugin Awareness** -- 210+ built-in stock plugin definitions across 8 major DAWs (Logic Pro, Ableton Live 12 Suite, Cubase 13 Pro, Pro Tools, Studio One 7, FL Studio, Reaper, GarageBand). Pick your DAW(s) in Settings and they're treated as available.
+- **RAG with hybrid retrieval** -- SQL FTS + semantic vector search over your plugin DB, with markdown-rendered responses and persistent multi-conversation history
 - **Per-Plugin Enrichment** -- Enrich individual plugins with optional user-provided URLs or PDF manuals
 - **Bulk Enrichment** -- Batch-process all unclassified plugins with streaming progress
 - **Chat History** -- SQLite-backed multi-conversation history with sidebar, search, and individual delete
@@ -102,9 +103,22 @@ Ask questions in natural language:
 - "Compare my optical compressors"
 - "Which plugins emulate the LA-2A?"
 
-The assistant searches your plugin database using hybrid SQL FTS + semantic vector search, then generates a contextual answer with your local LLM. Responses render with full markdown formatting (headers, lists, code, bold). Past user queries are searched for preference context so the assistant remembers your workflow across conversations.
+**Web-first architecture.** Every chat query runs in three phases:
 
-Conversations are saved automatically and accessible from the sidebar. Search past conversations or start a new one anytime. Use **Search Online** to enrich answers with live web results via SearXNG.
+1. **Web search first** — Daedalus searches the web (SearXNG, local) to get current real-world information about your question. This is the source of truth for technical facts.
+2. **Cross-reference your stock** — it checks which plugins mentioned in the web results you actually have: your scanned collection, plus the stock plugins bundled with your DAW(s).
+3. **Synthesize** — the LLM answers using web research for facts, and labels every plugin it recommends:
+   - **✓** — plugin is in your scanned collection (preferred)
+   - **🎛️** — plugin is bundled with your DAW (e.g. Logic's ChromaVerb)
+   - **[NOT INSTALLED]** — mentioned online but you don't own it
+
+This way the LLM can't hallucinate technical details (grounded in real web sources), and it can suggest plugins outside your collection with honest labeling. Web sources are shown as clickable links under each response.
+
+**Fallback.** If web search fails (offline, rate-limited), the chat silently falls back to searching your collection only.
+
+**DAW stock plugins.** Go to **Settings → Your DAW(s)** and select the DAW(s) you use (Logic Pro, Ableton Live 12 Suite, Cubase 13 Pro, Pro Tools, Studio One 7, FL Studio, Reaper, GarageBand). Daedalus ships with ~210 stock plugin definitions across these DAWs so they show up as 🎛️ recommendations without you needing to scan them.
+
+Conversations are saved automatically and accessible from the sidebar. Search past conversations or start a new one anytime. Use **Search Online** as a power-user escape hatch if you want to re-run a question with custom web context.
 
 ### Enrichment
 
@@ -164,6 +178,23 @@ Change the model via the **Settings** tab in the UI, or edit `OLLAMA_MODEL` in `
 > ⚠️ Note: The 26B model is a Mixture-of-Experts — 26B total parameters but only ~3.8B active per inference — so it's faster and lighter than a typical dense 26B model. It still needs enough RAM to memory-map the 17GB file though, which is why 24GB+ is recommended.
 
 The Settings tab also lets you configure **scan directories** -- add, remove, or reset the plugin folders that get scanned.
+
+### Your DAW(s)
+
+In **Settings → Your DAW(s)**, select the DAW(s) you use. Daedalus ships with ~210 stock plugin definitions for 8 major DAWs:
+
+| DAW | Stock plugins included |
+|-----|-----------------------|
+| Logic Pro | 42 (ChromaVerb, Space Designer, Compressor variants, Alchemy, Sculpture, Drummer...) |
+| Ableton Live 12 Suite | 35 (Glue Compressor, Hybrid Reverb, Operator, Wavetable, Drift, Meld...) |
+| Cubase 13 Pro | 33 (Frequency 2, REVerence, HALion Sonic, Padshop, Retrologue...) |
+| Pro Tools | 25 (Pro Compressor, D-Verb, BF-76, BF-2A, Structure...) |
+| Studio One 7 | 25 (Pro EQ3, Fat Channel XT, OpenAir 2, Mai Tai...) |
+| FL Studio | 24 (Fruity Parametric EQ 2, Maximus, Harmor, Sytrus, FLEX...) |
+| Reaper | 18 (ReaEQ, ReaComp, ReaXcomp, ReaFir, ReaVerb...) |
+| GarageBand | 8 (subset shared with Logic) |
+
+When chat answers a question, stock plugins from your selected DAW(s) appear as **🎛️** recommendations alongside your scanned **✓** plugins.
 
 ### Export / Import
 
