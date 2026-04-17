@@ -268,6 +268,10 @@ THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPL
 
 **Use at your own risk.** Back up your data regularly. This is an open-source community project, not a commercial product.
 
+## Acknowledgments
+
+Big thanks to **Hagai Davidoff** for the inspiration behind this project. His [video on organizing and getting the most out of your plugin collection](https://www.youtube.com/watch?v=WkOPXmyh3kg) was the spark that led me to build Daedalus.
+
 ## License
 
 GPL v3 -- see [LICENSE](LICENSE)
