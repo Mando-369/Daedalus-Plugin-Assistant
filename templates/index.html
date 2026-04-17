@@ -295,6 +295,18 @@
                 </div>
 
                 <div class="settings-section">
+                    <h3>Your DAW(s)</h3>
+                    <p class="settings-hint" style="margin-bottom:8px">
+                        Daedalus will consider the stock plugins bundled with your DAW(s) when answering questions. Select any DAWs you use.
+                    </p>
+                    <div id="user-daws-list"></div>
+                    <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                        <button class="btn btn-sm btn-primary" onclick="App.saveUserDaws()">Save DAWs</button>
+                        <span id="user-daws-result" class="settings-status"></span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
                     <h3>Scan Directories</h3>
                     <p class="settings-hint" style="margin-bottom:8px">
                         Directories scanned for audio plugins. Standard macOS paths are included by default.

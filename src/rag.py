@@ -16,7 +16,10 @@ import httpx
 
 from config import (
     LLM_SYSTEM_PROMPT, RAG_MAX_CONTEXT_PLUGINS,
-    RAG_CONTEXT_TEMPLATE, SEMANTIC_SEARCH_TOP_K, SQL_SEARCH_LIMIT,
+    RAG_CONTEXT_TEMPLATE, RAG_WEB_SECTION_TEMPLATE,
+    RAG_COLLECTION_SECTION_TEMPLATE, RAG_STOCK_SECTION_TEMPLATE,
+    RAG_WEB_MAX_CHARS, RAG_WEB_PAGE_MAX_CHARS, STOCK_PLUGINS_MAX_IN_CONTEXT,
+    SEMANTIC_SEARCH_TOP_K, SQL_SEARCH_LIMIT,
     OLLAMA_TEMPERATURE, OLLAMA_TOP_P,
 )
 from src.llm_client import get_chat_client
@@ -252,14 +255,18 @@ class RAGPipeline:
 
     # ── Context Building ───────────────────────────────
 
-    def build_context(self, plugins: list[dict], user_history: list[dict] = None) -> str:
-        """Format plugin data into a text context for the LLM."""
-        if not plugins:
-            return "No relevant plugins found in the database."
+    # ── Context Formatters ──────────────────────────
 
+    def _format_plugin_entries(self, plugins: list[dict], marker: str = "",
+                                start_index: int = 1) -> str:
+        """Format a list of plugin dicts into multi-line text blocks.
+
+        `marker` is prepended to the first line (e.g. "✓ " or "🎛️ ").
+        """
         entries = []
-        for i, p in enumerate(plugins, 1):
-            lines = [f"{i}. {p.get('display_name') or p.get('name', 'Unknown')}"]
+        for i, p in enumerate(plugins, start=start_index):
+            name = p.get('display_name') or p.get('name', 'Unknown')
+            lines = [f"{i}. {marker}{name}"]
             if p.get("developer"):
                 lines.append(f"   Developer: {p['developer']}")
             if p.get("category"):
@@ -294,11 +301,140 @@ class RAGPipeline:
 
             entries.append("\n".join(lines))
 
-        plugin_context = "\n\n".join(entries)
-        result = RAG_CONTEXT_TEMPLATE.format(plugin_context=plugin_context)
+        return "\n\n".join(entries)
+
+    def _format_stock_entries_compact(self, stock_plugins: list[dict]) -> str:
+        """Compact one-line format for DAW stock plugins to save tokens."""
+        lines = []
+        for p in stock_plugins[:STOCK_PLUGINS_MAX_IN_CONTEXT]:
+            name = p.get("name", "Unknown")
+            daw = p.get("_daw", "")
+            category = p.get("category", "")
+            sub = p.get("subcategory", "")
+            char = p.get("character", "")
+            best = p.get("best_used_for", "")
+            emu = p.get("emulation_of", "")
+
+            parts = [f"🎛️ {name} [{daw}]"]
+            cat_str = f"{category}" + (f"/{sub}" if sub else "")
+            if cat_str:
+                parts.append(cat_str)
+            if emu:
+                parts.append(f"emulates {emu}")
+            if char:
+                parts.append(char)
+            if best:
+                parts.append(f"best: {best}")
+            lines.append(" — ".join(parts))
+        return "\n".join(lines)
+
+    def format_web_context(self, web_results: list[dict],
+                            max_chars: int = None,
+                            per_page_max: int = None) -> str:
+        """Format web search results into a numbered context block.
+
+        Returns empty string if results are unusable (no page_content and
+        all snippets shorter than 40 chars). Truncates at max_chars total.
+        """
+        if not web_results:
+            return ""
+
+        if max_chars is None:
+            max_chars = RAG_WEB_MAX_CHARS
+        if per_page_max is None:
+            per_page_max = RAG_WEB_PAGE_MAX_CHARS
+
+        # Check usefulness
+        useful = False
+        for r in web_results:
+            if r.get("page_content"):
+                useful = True
+                break
+            snippet = r.get("snippet") or ""
+            if len(snippet) > 40:
+                useful = True
+                break
+        if not useful:
+            return ""
+
+        # Build formatted entries
+        out = []
+        used = 0
+        for i, r in enumerate(web_results, 1):
+            title = r.get("title", "")[:200]
+            url = r.get("url", "")
+            snippet = (r.get("snippet") or "").strip()
+            page = r.get("page_content") or ""
+            if page:
+                page = page[:per_page_max]
+
+            block_lines = [f"[{i}] {title}"]
+            if url:
+                block_lines.append(f"    URL: {url}")
+            if snippet:
+                block_lines.append(f"    Snippet: {snippet}")
+            if page:
+                block_lines.append(f"    Content: {page}")
+            block = "\n".join(block_lines)
+
+            # Enforce total budget
+            if used + len(block) > max_chars:
+                remaining = max_chars - used
+                if remaining > 200:
+                    block = block[:remaining] + "\n    [...truncated]"
+                    out.append(block)
+                break
+
+            out.append(block)
+            used += len(block) + 2  # +2 for separator
+
+        return "\n\n".join(out)
+
+    # ── Full Context Builder ─────────────────────────
+
+    def build_context(self, web_str: str = "", collection_plugins: list[dict] = None,
+                       stock_plugins: list[dict] = None, daw_list: str = "",
+                       user_history: list[dict] = None) -> str:
+        """Assemble the full LLM context from web + collection + stock sections.
+
+        Any empty section is omitted from the output. `web_str` should be
+        pre-formatted (via format_web_context()).
+        """
+        collection_plugins = collection_plugins or []
+        stock_plugins = stock_plugins or []
+
+        # Web section
+        web_section = ""
+        if web_str:
+            web_section = RAG_WEB_SECTION_TEMPLATE.format(web_context=web_str)
+
+        # Collection section
+        collection_section = ""
+        if collection_plugins:
+            plugin_context = self._format_plugin_entries(
+                collection_plugins, marker="✓ ", start_index=1,
+            )
+            collection_section = RAG_COLLECTION_SECTION_TEMPLATE.format(
+                plugin_context=plugin_context,
+            )
+
+        # Stock section
+        stock_section = ""
+        if stock_plugins:
+            stock_context = self._format_stock_entries_compact(stock_plugins)
+            stock_section = RAG_STOCK_SECTION_TEMPLATE.format(
+                daw_list=daw_list or "selected DAW(s)",
+                stock_context=stock_context,
+            )
+
+        result = RAG_CONTEXT_TEMPLATE.format(
+            web_section=web_section,
+            collection_section=collection_section,
+            stock_section=stock_section,
+        )
 
         if user_history:
-            result += "\n\nPrevious user queries (for preference context only — always verify against current plugin data):\n"
+            result += "\n\nPrevious user queries (for preference context only — always verify against the current context):\n"
             for h in user_history:
                 result += f"- \"{h['content'][:200]}\"\n"
 

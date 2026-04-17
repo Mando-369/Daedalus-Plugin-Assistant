@@ -675,6 +675,67 @@ async def chat(msg: ChatMessage):
 
 # ── WebSocket Chat (Streaming) ────────────────────
 
+# Per-conversation web-search cache (key: (conv_id, query_norm) → (web_str, results))
+# TTL 10 minutes, max 50 entries.
+import time as _time
+_WEB_CACHE: dict = {}
+_WEB_CACHE_TTL = 600
+_WEB_CACHE_MAX = 50
+
+
+def _web_cache_key(conv_id, query: str) -> tuple:
+    return (conv_id, (query or "").strip().lower())
+
+
+def _web_cache_get(conv_id, query: str):
+    key = _web_cache_key(conv_id, query)
+    entry = _WEB_CACHE.get(key)
+    if not entry:
+        return None
+    ts, web_str, results = entry
+    if _time.time() - ts > _WEB_CACHE_TTL:
+        _WEB_CACHE.pop(key, None)
+        return None
+    return (web_str, results)
+
+
+def _web_cache_set(conv_id, query: str, web_str: str, results: list):
+    # Simple LRU trim
+    if len(_WEB_CACHE) >= _WEB_CACHE_MAX:
+        # drop oldest entry
+        oldest_key = min(_WEB_CACHE, key=lambda k: _WEB_CACHE[k][0])
+        _WEB_CACHE.pop(oldest_key, None)
+    _WEB_CACHE[_web_cache_key(conv_id, query)] = (_time.time(), web_str, results)
+
+
+async def _fetch_web_context(user_query: str, rag) -> tuple[str, list]:
+    """Run web search + parallel page fetches, return (formatted_str, raw_results).
+
+    Raises on error — caller wraps in try/except for silent fallback.
+    """
+    from src.agents.tools import web_search, fetch_page
+
+    raw_results = await asyncio.to_thread(web_search, user_query, 5)
+    real_results = [
+        r for r in raw_results
+        if r.get("url") and not r.get("error") and not r.get("info")
+    ]
+
+    # Parallel fetch of top 2 pages
+    top_urls = [r["url"] for r in real_results[:2]]
+    if top_urls:
+        fetches = await asyncio.gather(
+            *[asyncio.to_thread(fetch_page, u) for u in top_urls],
+            return_exceptions=True,
+        )
+        for r, page in zip(real_results[:2], fetches):
+            if isinstance(page, str) and not page.startswith("HTTP ") and not page.startswith("Skipped"):
+                r["page_content"] = page
+
+    web_str = rag.format_web_context(real_results)
+    return web_str, real_results
+
+
 @app.websocket("/ws/chat")
 async def websocket_chat(websocket: WebSocket):
     """WebSocket endpoint for streaming chat responses."""
@@ -710,21 +771,62 @@ async def websocket_chat(websocket: WebSocket):
             try:
                 rag = get_rag()
 
-                # Search phase
+                # ── Phase 1: Web search (source of truth) ──
                 await websocket.send_json({
                     "type": "status",
-                    "content": "Searching plugin database..."
+                    "content": "Searching the web..."
+                })
+
+                web_str = ""
+                web_results_for_sources = []
+                try:
+                    cached = _web_cache_get(conv_id, user_query)
+                    if cached is not None:
+                        web_str, web_results_for_sources = cached
+                    else:
+                        web_str, web_results_for_sources = await asyncio.wait_for(
+                            _fetch_web_context(user_query, rag),
+                            timeout=8.0,
+                        )
+                        _web_cache_set(conv_id, user_query, web_str, web_results_for_sources)
+                except (asyncio.TimeoutError, Exception) as e:
+                    print(f"Web search phase skipped: {e}")
+                    web_str = ""
+                    web_results_for_sources = []
+
+                # ── Phase 2: Cross-reference collection + stock ──
+                await websocket.send_json({
+                    "type": "status",
+                    "content": "Cross-referencing your collection..."
                 })
 
                 plugins = await asyncio.to_thread(rag.hybrid_search, user_query)
                 user_history = await asyncio.to_thread(
                     rag.search_user_history, user_query, conv_id,
                 )
-                context = rag.build_context(plugins, user_history)
 
-                # Append web search context if provided
+                # Load user's configured DAW(s) and get stock plugins
+                from src.daw_stock_plugins import get_stock_plugins_for
+                user_daws_raw = get_setting("user_daws", "[]")
+                try:
+                    user_daws = json.loads(user_daws_raw) or []
+                except Exception:
+                    user_daws = []
+                stock_plugins = get_stock_plugins_for(user_daws) if user_daws else []
+
+                # Assemble the full context
+                context = rag.build_context(
+                    web_str=web_str,
+                    collection_plugins=plugins,
+                    stock_plugins=stock_plugins,
+                    daw_list=", ".join(user_daws) if user_daws else "",
+                    user_history=user_history,
+                )
+
+                # Legacy: still accept explicit web_context from the frontend's
+                # "Search Online" button as an additional injected note
                 if web_context:
-                    context += f"\n\nAdditional web research:\n{web_context}"
+                    context += f"\n\nAdditional manual web research:\n{web_context}"
 
                 sources = [
                     {
@@ -738,6 +840,11 @@ async def websocket_chat(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "sources",
                     "content": sources,
+                    "web_sources": [
+                        {"title": r.get("title", ""), "url": r.get("url", "")}
+                        for r in web_results_for_sources
+                        if r.get("url")
+                    ],
                 })
 
                 # Generation phase - stream tokens (async, non-blocking)
@@ -852,6 +959,31 @@ async def update_scan_dirs(dirs: list):
     """Update scan directories."""
     set_setting("scan_dirs", json.dumps(dirs))
     return {"status": "updated"}
+
+
+# ── DAW Selection API ─────────────────────────────
+
+@app.get("/api/settings/daws")
+async def get_user_daws():
+    """Get the user's selected DAW(s) + list of supported DAWs."""
+    from src.daw_stock_plugins import SUPPORTED_DAWS
+    raw = get_setting("user_daws", "[]")
+    try:
+        selected = json.loads(raw)
+        if not isinstance(selected, list):
+            selected = []
+    except Exception:
+        selected = []
+    return {"supported": SUPPORTED_DAWS, "selected": selected}
+
+
+@app.put("/api/settings/daws")
+async def update_user_daws(daws: list[str]):
+    """Update the user's selected DAW(s). Filters to only supported entries."""
+    from src.daw_stock_plugins import SUPPORTED_DAWS
+    filtered = [d for d in daws if d in SUPPORTED_DAWS]
+    set_setting("user_daws", json.dumps(filtered))
+    return {"status": "updated", "selected": filtered}
 
 
 # ── Scan & Populate API ───────────────────────────

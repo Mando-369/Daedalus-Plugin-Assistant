@@ -443,6 +443,37 @@ body {
     color: var(--text-accent);
 }
 
+.msg-web-sources {
+    margin-top: 6px;
+    padding-top: 6px;
+    font-size: 11px;
+}
+
+.web-sources-label {
+    color: var(--muted);
+    margin-bottom: 2px;
+}
+
+.web-sources-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.web-source-link {
+    padding: 2px 6px;
+    background: rgba(100, 149, 237, 0.15);
+    border-radius: 3px;
+    color: #8ab4f8;
+    text-decoration: none;
+    font-size: 10px;
+}
+
+.web-source-link:hover {
+    background: rgba(100, 149, 237, 0.25);
+    text-decoration: underline;
+}
+
 .msg-thinking {
     margin-bottom: 8px;
     border: 1px solid rgba(168, 85, 247, 0.2);

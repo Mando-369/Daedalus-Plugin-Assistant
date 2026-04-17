@@ -44,7 +44,7 @@ const App = (() => {
         if (tab === 'browse') loadPlugins();
         if (tab === 'review') { loadReviewPlugins(); _populateReviewDevFilter(); }
         if (tab === 'stats') loadStats();
-        if (tab === 'settings') { loadSettings(); loadScanDirs(); }
+        if (tab === 'settings') { loadSettings(); loadScanDirs(); loadUserDaws(); }
     }
 
     // ── Chat ────────────────────────────────────
@@ -115,6 +115,7 @@ const App = (() => {
                 // Store sources to append after done
                 if (currentAssistantEl) {
                     currentAssistantEl._sources = data.content;
+                    currentAssistantEl._webSources = data.web_sources || [];
                 }
                 break;
             case 'thinking':
@@ -187,6 +188,34 @@ const App = (() => {
                             sourcesDiv.appendChild(tag);
                         });
                         body.appendChild(sourcesDiv);
+                    }
+
+                    // Add web sources (provenance for web-search-grounded answers)
+                    if (currentAssistantEl._webSources && currentAssistantEl._webSources.length) {
+                        const webDiv = document.createElement('div');
+                        webDiv.className = 'msg-web-sources';
+                        webDiv.innerHTML = '<div class="web-sources-label">Web sources:</div>';
+                        const linkList = document.createElement('div');
+                        linkList.className = 'web-sources-links';
+                        currentAssistantEl._webSources.forEach(ws => {
+                            if (!ws.url) return;
+                            let domain = '';
+                            try {
+                                domain = new URL(ws.url).hostname.replace(/^www\./, '');
+                            } catch (e) {
+                                domain = ws.url;
+                            }
+                            const link = document.createElement('a');
+                            link.href = ws.url;
+                            link.target = '_blank';
+                            link.rel = 'noopener noreferrer';
+                            link.className = 'web-source-link';
+                            link.title = ws.title || ws.url;
+                            link.textContent = domain;
+                            linkList.appendChild(link);
+                        });
+                        webDiv.appendChild(linkList);
+                        body.appendChild(webDiv);
                     }
 
                     // Add "Search Online" button per response
@@ -1448,6 +1477,59 @@ const App = (() => {
         }
     }
 
+    // ── DAW Selection ───────────────────────────
+    let _supportedDaws = [];
+    let _selectedDaws = [];
+
+    async function loadUserDaws() {
+        try {
+            const resp = await fetch('/api/settings/daws');
+            const data = await resp.json();
+            _supportedDaws = data.supported || [];
+            _selectedDaws = data.selected || [];
+            _renderUserDaws();
+        } catch (e) {
+            console.error('Failed to load DAWs:', e);
+        }
+    }
+
+    function _renderUserDaws() {
+        const list = document.getElementById('user-daws-list');
+        if (!list) return;
+        list.innerHTML = _supportedDaws.map(d => {
+            const checked = _selectedDaws.includes(d) ? 'checked' : '';
+            const id = `daw-${d.replace(/[^a-z0-9]/gi, '_')}`;
+            return `
+                <label for="${id}" style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">
+                    <input type="checkbox" id="${id}" value="${esc(d)}" ${checked}>
+                    <span>${esc(d)}</span>
+                </label>
+            `;
+        }).join('');
+    }
+
+    async function saveUserDaws() {
+        const resultEl = document.getElementById('user-daws-result');
+        const checked = Array.from(
+            document.querySelectorAll('#user-daws-list input[type=checkbox]:checked')
+        ).map(el => el.value);
+        try {
+            const resp = await fetch('/api/settings/daws', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(checked),
+            });
+            const data = await resp.json();
+            _selectedDaws = data.selected || checked;
+            resultEl.textContent = `Saved (${_selectedDaws.length} DAW${_selectedDaws.length === 1 ? '' : 's'})`;
+            resultEl.style.color = 'var(--success)';
+            setTimeout(() => { resultEl.textContent = ''; }, 3000);
+        } catch (e) {
+            resultEl.textContent = `Error: ${e.message}`;
+            resultEl.style.color = 'var(--error)';
+        }
+    }
+
     // ── Export / Import ─────────────────────────
     function exportPlugins(format) {
         window.location.href = `/api/export?format=${format}`;
@@ -1585,6 +1667,8 @@ const App = (() => {
         loadReviewPlugins,
         exportPlugins,
         importPlugins,
+        loadUserDaws,
+        saveUserDaws,
         _paginate,
     };
 })();
