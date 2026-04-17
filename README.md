@@ -28,11 +28,32 @@ A local macOS application that manages, classifies, and provides intelligent sea
 
 ## Prerequisites
 
-- **macOS** (scans `/Library/Audio/Plug-Ins/` directories)
+- **macOS** (primary target — scans `/Library/Audio/Plug-Ins/` directories)
 - **Python 3.10 - 3.13**
 - **Ollama** -- local LLM inference -- [ollama.com](https://ollama.com)
 - **Docker** -- for SearXNG (optional but recommended) -- [docker.com](https://www.docker.com/products/docker-desktop/)
 - **16GB+ RAM** recommended (32GB+ for larger models)
+
+### Platform Support
+
+Daedalus is currently **macOS-only in practice**, but most of the codebase is cross-platform. Here's the honest breakdown:
+
+| Component | macOS | Linux | Windows |
+|-----------|-------|-------|---------|
+| Web app / chat / RAG | ✓ | ✓ | ✓ |
+| Enrichment agents | ✓ | ✓ | ✓ |
+| Ollama integration | ✓ | ✓ | ✓ |
+| SearXNG (Docker) | ✓ | ✓ | ✓ |
+| Plugin scanner | ✓ | ✗ | ✗ |
+| `run.sh` startup script | ✓ | ~ | ✗ |
+
+The **plugin scanner** is the blocker. It reads macOS `.component` AU bundles and parses `Info.plist` files — neither exists on Windows/Linux. VST3 file *discovery* is cross-platform but *metadata extraction* currently relies on macOS bundle structure.
+
+**Linux users** can probably get it working with: a custom `scan_dirs` pointing at your VST3 folders (metadata fields will be empty until you enrich), a bash shell, and skipping the AU parts. `run.sh` should mostly work.
+
+**Windows users** would need a PowerShell/batch equivalent of `run.sh` plus a Windows-aware VST3 scanner that reads the plugin's `moduleinfo.json` or queries the bundle directly.
+
+Contributions welcome — if you can get it running on Linux or Windows, please open a PR.
 
 ## Quick Start
 
