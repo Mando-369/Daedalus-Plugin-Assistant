@@ -270,7 +270,7 @@ THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPL
 
 ## Acknowledgments
 
-Big thanks to **Hagai Davidoff** for the inspiration behind this project. His [video on organizing and getting the most out of your plugin collection](https://www.youtube.com/watch?v=WkOPXmyh3kg) was the spark that led me to build Daedalus.
+Big thanks to **Hagai Davidoff** for the inspiration behind this project. His [video on organizing and getting the most out of your plugin collection](https://www.youtube.com/watch?v=WkOPXmyh3kg) was the spark that led me to build Daedalus. Check out his own [Studio Concierge Gemini Gem](https://gemini.google.com/gem/d435eafca1c3?usp=sharing) too.
 
 ## License
 
