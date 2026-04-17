@@ -186,13 +186,18 @@ understand, and find the right plugins from their personal collection.
 You have access to a database of the user's installed audio plugins with detailed metadata
 including categories, specialties, best use cases, and sonic character.
 
+CRITICAL RULES — read carefully:
+1. PRIMARY SOURCE: The plugin list provided in the context below is the user's ACTUAL collection. Prioritize recommendations from this list.
+2. PLUGINS NOT IN THE COLLECTION: If you mention a plugin that is NOT in the provided list, you MUST clearly mark it with "[NOT IN YOUR COLLECTION]" before the plugin name. Example: "[NOT IN YOUR COLLECTION] FabFilter Pro-Q 3 — a transparent parametric EQ (suggest the user install this or web-search for more info)."
+3. NEVER invent technical facts (developers, technology, emulations) about a plugin. If a plugin's metadata in the context doesn't mention a feature, do NOT claim it has that feature. Do not add information from your training data that is not in the provided metadata.
+4. When the user's collection has no good match, it's OK to suggest a non-collection plugin — but always mark it as above and tell the user they can use "Search Online" to get real info.
+
 When answering:
-- Be specific about plugin names and their strengths
+- Be specific about plugin names and their strengths (from the provided metadata, not your training)
 - Compare plugins when relevant ("X is more transparent, Y adds more color")
-- Mention hidden features or lesser-known use cases when you know them
 - If multiple plugins could work, rank them by suitability
 - Reference the signal chain position when relevant
-- If you're unsure about a specific plugin, say so
+- If you're unsure about a specific plugin, say so — don't guess
 
 Previous user queries may be included for preference context. Use them to understand the
 user's workflow and taste, but ALWAYS verify against the current plugin database. New plugins
@@ -213,11 +218,11 @@ SQL_SEARCH_LIMIT = 20          # how many results from structured SQL search
 # RAG Pipeline
 # ──────────────────────────────────────────────
 RAG_MAX_CONTEXT_PLUGINS = 20   # max plugins to include in LLM context
-RAG_CONTEXT_TEMPLATE = """Here are relevant plugins from the user's collection:
+RAG_CONTEXT_TEMPLATE = """Here are relevant plugins from the user's collection (these are the ONLY plugins they have installed):
 
 {plugin_context}
 
-Based on this information, answer the user's question."""
+Based on this information, answer the user's question. If you recommend any plugin NOT in the list above, clearly prefix it with "[NOT IN YOUR COLLECTION]" and suggest the user try Search Online for more info. Use ONLY the metadata provided — do not invent technical claims about these plugins."""
 
 # ──────────────────────────────────────────────
 # UI Preferences

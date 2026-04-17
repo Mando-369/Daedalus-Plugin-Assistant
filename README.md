@@ -124,6 +124,8 @@ Conversations are saved automatically and accessible from the sidebar. Search pa
 5. **Pause/Resume/Cancel** anytime -- auto-pauses on rate limits or batch limits
 6. Dismiss individual plugins from the queue with the X button
 
+> ⚠️ **Review enriched data before trusting it.** The enrichment agents use LLMs that can hallucinate technical details — wrong developers, fabricated technology claims, or confused hardware emulations. Always spot-check the descriptions and tags on enriched plugins, especially for plugins you'll rely on in recommendations. You can edit any field directly in the edit modal, or bulk-review via the Review tab.
+
 ### Editing & Review
 
 - Click any plugin card to open the full metadata editor
@@ -145,6 +147,21 @@ Click the **Settings** tab to configure your LLM backend. A provider comparison 
 | **DeepSeek** | Very cheap | Cloud (China) | Global | Budget option, strong reasoning |
 
 Default is **Local Ollama**. You can set separate models for chat and enrichment agents (e.g., fast local model for agents, powerful cloud model for chat). Test your connection from the Settings tab before saving.
+
+#### Recommended Gemma 4 variant by system RAM
+
+Daedalus ships with `gemma4:26b` as the default. If you have less RAM, pick a smaller variant instead:
+
+| System RAM | Recommended model | Size on disk | Notes |
+|------------|-------------------|--------------|-------|
+| **8 GB** | `gemma4:e2b` | ~2 GB | Edge model (2.3B effective params). Fast, less capable. |
+| **16 GB** | `gemma4:e4b` or `gemma4:latest` | ~7–9 GB | Edge model (4.5B effective). Comfortable headroom for browser/OS. |
+| **24 GB** | `gemma4:26b` | 17 GB | MoE (26B total, 3.8B active). Tight but usable. |
+| **32 GB+** | `gemma4:26b` or `gemma4:31b` | 17–20 GB | Plenty of headroom. 31b is dense, higher quality. |
+
+Change the model via the **Settings** tab in the UI, or edit `OLLAMA_MODEL` in `config.py`.
+
+> ⚠️ Note: The 26B model is a Mixture-of-Experts — 26B total parameters but only ~3.8B active per inference — so it's faster and lighter than a typical dense 26B model. It still needs enough RAM to memory-map the 17GB file though, which is why 24GB+ is recommended.
 
 The Settings tab also lets you configure **scan directories** -- add, remove, or reset the plugin folders that get scanned.
 
